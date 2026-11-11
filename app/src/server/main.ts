@@ -21,7 +21,7 @@ const config: RoomConfig = {
   intervalMs: env('SESSION_EVERY_MIN', 2) * 60_000,
   minLobbyMs: env('MIN_LOBBY_S', 15) * 1000,
   pauseMs: env('PAUSE_S', 2.5) * 1000,
-  groupCount: env('GROUPS', 10),
+  groupCount: env('SESSION_GROUPS', 10), // not GROUPS: that name is reserved in bash
   lookaheadMs: 8000,
   graceMs: 2000,
   soloLeadMs: 4000,
