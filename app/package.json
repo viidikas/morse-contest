@@ -1,0 +1,17 @@
+{
+  "name": "morse-contest",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "tsc && node dist/test/engine.test.js && node dist/test/room.test.js",
+    "serve": "node tools/serve.mjs",
+    "start": "node dist/server/main.js",
+    "dev": "tsc && node dist/server/main.js"
+  },
+  "devDependencies": {
+    "@types/node": "^16.18.126",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Morse trainer</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1 data-t="title">Morse trainer</h1>
+    <div class="lang">
+      <button type="button" data-lang="et" aria-pressed="false">ET</button>
+      <button type="button" data-lang="en" aria-pressed="true">EN</button>
+    </div>
+  </header>
+  <p class="lead" data-t="intro"></p>
+
+  <section id="view-setup" class="panel">
+    <div class="field">
+      <label for="level" data-t="level"></label><output id="level-value"></output>
+      <input id="level" type="range" min="2" max="41" step="1">
+    </div>
+    <div class="chars mono" id="chars"></div>
+    <div class="field">
+      <label for="charWpm" data-t="charSpeed"></label><output id="charWpm-value"></output>
+      <input id="charWpm" type="range" min="12" max="40" step="1">
+    </div>
+    <div class="field">
+      <label for="effWpm" data-t="effSpeed"></label><output id="effWpm-value"></output>
+      <input id="effWpm" type="range" min="4" max="40" step="1">
+    </div>
+    <div class="field">
+      <label for="pauseS" data-t="pause"></label><output id="pauseS-value"></output>
+      <input id="pauseS" type="range" min="1" max="8" step="0.5">
+    </div>
+    <div class="field">
+      <label for="groups" data-t="groups"></label><output id="groups-value"></output>
+      <input id="groups" type="range" min="5" max="60" step="5">
+    </div>
+    <div class="field">
+      <label for="pitch" data-t="pitch"></label><output id="pitch-value"></output>
+      <input id="pitch" type="range" min="400" max="900" step="10">
+    </div>
+    <div class="field">
+      <label for="volume" data-t="volume"></label><output id="volume-value"></output>
+      <input id="volume" type="range" min="0.05" max="1" step="0.05">
+    </div>
+    <div class="actions">
+      <button type="button" class="primary" id="start" data-t="start"></button>
+      <button type="button" class="secondary" id="test-tone" data-t="testTone"></button>
+      <span class="note"><span data-t="duration"></span>: <span id="duration"></span></span>
+    </div>
+  </section>
+
+  <section id="view-run" class="panel" hidden>
+    <input id="answer" class="mono" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="12">
+    <progress id="progress" value="0" max="1"></progress>
+    <div class="runline"><span id="status"></span><span id="time-left"></span></div>
+    <div class="actions"><button type="button" class="secondary" id="stop" data-t="stop"></button></div>
+  </section>
+
+  <section id="view-result" hidden>
+    <div class="panel">
+      <div data-t="accuracy"></div>
+      <div class="big" id="accuracy"></div>
+      <div id="accuracy-detail" class="runline"></div>
+      <div id="level-up" class="levelup" data-t="levelUp" hidden></div>
+      <div class="actions"><button type="button" class="primary" id="again" data-t="again"></button></div>
+    </div>
+
+    <h2 data-t="confusions"></h2>
+    <ul id="result-confusions"></ul>
+
+    <h2 data-t="perChar"></h2>
+    <div class="scroll"><table>
+      <thead><tr><th data-t="char"></th><th class="num" data-t="times"></th><th class="num" data-t="right"></th><th class="num">%</th></tr></thead>
+      <tbody id="result-chars"></tbody>
+    </table></div>
+
+    <h2 data-t="result"></h2>
+    <div class="scroll"><table>
+      <thead><tr><th class="num">#</th><th data-t="sent"></th><th data-t="typed"></th><th class="num"></th></tr></thead>
+      <tbody id="result-groups"></tbody>
+    </table></div>
+    <p class="legend" data-t="legend"></p>
+  </section>
+  <nav class="pages"><a href="contest.html" data-t="toContest"></a></nav>
+</main>
+<script type="module" src="../dist/web/trainer.js"></script>
+</body>
+</html>

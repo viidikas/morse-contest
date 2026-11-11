@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Morse contest</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1 data-t="contestTitle">Morse contest</h1>
+    <div class="lang">
+      <button type="button" data-lang="et" aria-pressed="false">ET</button>
+      <button type="button" data-lang="en" aria-pressed="true">EN</button>
+    </div>
+  </header>
+  <p class="lead" data-t="contestIntro"></p>
+  <p id="net-error" class="warn" data-t="noConnection" hidden></p>
+
+  <section id="view-join" class="panel" hidden>
+    <form id="join-form">
+      <div class="field-text">
+        <label for="name" data-t="yourName"></label>
+        <input id="name" type="text" maxlength="20" autocomplete="nickname" required>
+      </div>
+      <p id="join-error" class="warn" hidden></p>
+      <div class="actions"><button type="submit" class="primary" data-t="join"></button></div>
+    </form>
+  </section>
+
+  <section id="view-lobby" hidden>
+    <div class="panel">
+      <div data-t="startsIn"></div>
+      <div class="countdown" id="countdown"></div>
+      <div class="muted"><span data-t="startsAt"></span> <span id="start-clock"></span></div>
+    </div>
+
+    <h2 data-t="inRoom"></h2>
+    <ul class="people" id="people"></ul>
+
+    <h2 data-t="roomChars"></h2>
+    <div class="mono" id="room-chars"></div>
+    <div class="muted"><span data-t="speed"></span>: <span id="room-speed"></span></div>
+
+    <h2 data-t="soundCheck"></h2>
+    <div class="panel">
+      <div class="field">
+        <label for="pitch" data-t="pitch"></label><output id="pitch-value"></output>
+        <input id="pitch" type="range" min="400" max="900" step="10">
+      </div>
+      <div class="field">
+        <label for="volume" data-t="volume"></label><output id="volume-value"></output>
+        <input id="volume" type="range" min="0.05" max="1" step="0.05">
+      </div>
+      <div class="actions"><button type="button" class="secondary" id="test-tone" data-t="testTone"></button></div>
+    </div>
+  </section>
+
+  <section id="view-run" class="panel" hidden>
+    <p id="late-note" class="muted" data-t="joinedLate" hidden></p>
+    <input id="answer" class="mono" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="12">
+    <progress id="progress" value="0" max="1"></progress>
+    <div class="runline"><span id="status"></span><span id="time-left"></span></div>
+  </section>
+
+  <section id="view-wait" class="panel" hidden>
+    <p data-t="waitingResults"></p>
+  </section>
+
+  <section id="view-result" hidden>
+    <h2 data-t="scoreboard"></h2>
+    <div class="scroll"><table>
+      <thead><tr><th class="num" data-t="rank"></th><th data-t="name"></th><th class="num" data-t="points"></th><th class="num" data-t="accuracy"></th></tr></thead>
+      <tbody id="board"></tbody>
+    </table></div>
+
+    <h2 data-t="yourResult"></h2>
+    <div class="panel">
+      <div data-t="accuracy"></div>
+      <div class="big" id="accuracy"></div>
+      <div id="accuracy-detail" class="runline"></div>
+      <div class="actions">
+        <button type="button" class="primary" id="next" data-t="nextSession"></button>
+        <span class="note"><span data-t="nextAt"></span> <span id="next-clock"></span></span>
+      </div>
+    </div>
+
+    <h2 data-t="confusions"></h2>
+    <ul id="result-confusions"></ul>
+
+    <h2 data-t="perChar"></h2>
+    <div class="scroll"><table>
+      <thead><tr><th data-t="char"></th><th class="num" data-t="times"></th><th class="num" data-t="right"></th><th class="num">%</th></tr></thead>
+      <tbody id="result-chars"></tbody>
+    </table></div>
+
+    <h2 data-t="result"></h2>
+    <div class="scroll"><table>
+      <thead><tr><th class="num">#</th><th data-t="sent"></th><th data-t="typed"></th><th class="num"></th></tr></thead>
+      <tbody id="result-groups"></tbody>
+    </table></div>
+    <p class="legend" data-t="legend"></p>
+  </section>
+
+  <div id="sound-off" class="panel" hidden>
+    <p class="warn" data-t="soundOff"></p>
+    <div class="actions"><button type="button" class="primary" id="enable-sound" data-t="enableSound"></button></div>
+  </div>
+
+  <nav class="pages"><a href="index.html" data-t="toTrainer"></a></nav>
+</main>
+<script type="module" src="../dist/web/contest.js"></script>
+</body>
+</html>

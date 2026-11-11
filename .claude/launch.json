@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "morse-contest",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["app/dist/server/main.js"],
+      "port": 5180
+    },
+    {
+      "name": "morse-trainer",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["app/tools/serve.mjs"],
+      "port": 5173
+    }
+  ]
+}

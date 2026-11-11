@@ -1,0 +1,58 @@
+:root {
+  --bg: #f6f5f1; --panel: #ffffff; --text: #1c1b19; --muted: #6b6860; --line: #dedbd3;
+  --accent: #b4541a; --accent-text: #ffffff; --ok: #1f7a3d; --bad: #b3261e;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161513; --panel: #201f1c; --text: #ece9e2; --muted: #a09c92; --line: #37352f;
+    --accent: #e08a4f; --accent-text: #1c1b19; --ok: #6fcf8e; --bad: #f2877f;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, "Segoe UI", sans-serif; }
+main { max-width: 720px; margin: 0 auto; padding: 24px 16px 64px; }
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+h1 { font-size: 1.6rem; margin: 0; letter-spacing: 0.02em; }
+h2 { font-size: 1.05rem; margin: 28px 0 10px; }
+p.lead { color: var(--muted); margin: 0 0 20px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+.lang button { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 6px; padding: 2px 9px; cursor: pointer; font: inherit; font-size: 0.85rem; }
+.lang button[aria-pressed="true"] { color: var(--text); border-color: var(--text); }
+.field { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; margin-bottom: 14px; }
+.field label { font-size: 0.95rem; }
+.field output { font-variant-numeric: tabular-nums; color: var(--muted); }
+.field input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+.mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: 0.12em; }
+.chars { color: var(--muted); margin: -6px 0 14px; word-spacing: 0.1em; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 18px; }
+button.primary, button.secondary { font: inherit; border-radius: 8px; padding: 10px 20px; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.note { color: var(--muted); font-size: 0.9rem; margin-left: auto; }
+#answer { width: 100%; font-size: 2rem; text-align: center; text-transform: uppercase; padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+progress { width: 100%; height: 8px; accent-color: var(--accent); margin: 16px 0 6px; }
+.runline { display: flex; justify-content: space-between; color: var(--muted); font-variant-numeric: tabular-nums; }
+.big { font-size: 3.2rem; font-weight: 700; line-height: 1.1; }
+.ok { color: var(--ok); } .bad { color: var(--bad); }
+.extra { color: var(--muted); text-decoration: line-through; }
+.levelup { color: var(--ok); margin-top: 6px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 5px 14px 5px 0; border-bottom: 1px solid var(--line); }
+th { font-size: 0.85rem; color: var(--muted); font-weight: 500; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+ul { margin: 0; padding-left: 20px; }
+.legend { color: var(--muted); font-size: 0.85rem; margin-top: 8px; }
+tr.skipped { opacity: 0.45; }
+tr.you td { font-weight: 700; }
+.field-text { display: grid; gap: 6px; margin-bottom: 14px; }
+.field-text input { font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); width: 100%; }
+.countdown { font-size: 3.2rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.people { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.people li { border: 1px solid var(--line); border-radius: 999px; padding: 2px 12px; font-size: 0.9rem; }
+.people li.offline { opacity: 0.45; }
+.people li.you { border-color: var(--accent); }
+.warn { color: var(--bad); }
+.muted { color: var(--muted); }
+nav.pages { margin-top: 28px; font-size: 0.9rem; }
+nav.pages a { color: var(--muted); }
