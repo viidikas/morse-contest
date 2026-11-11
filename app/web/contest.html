@@ -6,7 +6,7 @@
 <title>Morse contest</title>
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body data-mode="contest">
 <main>
   <header>
     <h1 data-t="contestTitle">Morse contest</h1>
@@ -16,28 +16,34 @@
     </div>
   </header>
   <p class="lead" data-t="contestIntro"></p>
+  <p><button type="button" class="link" id="chart-toggle" aria-controls="chart"></button></p>
   <p id="net-error" class="warn" data-t="noConnection" hidden></p>
 
-  <section id="view-join" class="panel" hidden>
-    <form id="join-form">
+  <section id="view-join" hidden>
+    <div class="panel">
       <div class="field-text">
         <label for="name" data-t="yourName"></label>
-        <input id="name" type="text" maxlength="20" autocomplete="nickname" required>
+        <input id="name" type="text" maxlength="20" autocomplete="nickname">
       </div>
       <p id="join-error" class="warn" hidden></p>
-      <div class="actions"><button type="submit" class="primary" data-t="join"></button></div>
-    </form>
+    </div>
+    <h2 data-t="chooseLevel"></h2>
+    <div id="levels" class="levels"></div>
   </section>
 
   <section id="view-lobby" hidden>
     <div class="panel">
-      <div data-t="startsIn"></div>
+      <div class="contest-only" data-t="startsIn"></div>
+      <div class="test-only" data-t="testStartsIn"></div>
       <div class="countdown" id="countdown"></div>
-      <div class="muted"><span data-t="startsAt"></span> <span id="start-clock"></span></div>
+      <div class="muted contest-only"><span data-t="startsAt"></span> <span id="start-clock"></span></div>
+      <p class="muted test-only" data-t="testIntro"></p>
     </div>
 
-    <h2 data-t="inRoom"></h2>
-    <ul class="people" id="people"></ul>
+    <div class="contest-only">
+      <h2 data-t="inRoom"></h2>
+      <ul class="people" id="people"></ul>
+    </div>
 
     <h2 data-t="roomChars"></h2>
     <div class="mono" id="room-chars"></div>
@@ -69,19 +75,27 @@
   </section>
 
   <section id="view-result" hidden>
-    <h2 data-t="scoreboard"></h2>
-    <div class="scroll"><table>
-      <thead><tr><th class="num" data-t="rank"></th><th data-t="name"></th><th class="num" data-t="points"></th><th class="num" data-t="accuracy"></th></tr></thead>
-      <tbody id="board"></tbody>
-    </table></div>
+    <div class="panel test-only">
+      <p id="test-verdict" class="verdict"></p>
+      <div class="actions"><button type="button" class="primary" id="back" data-t="backToRooms"></button></div>
+    </div>
+
+    <div class="contest-only">
+      <h2 data-t="scoreboard"></h2>
+      <div class="scroll"><table>
+        <thead><tr><th class="num" data-t="rank"></th><th data-t="name"></th><th class="num" data-t="points"></th><th class="num" data-t="accuracy"></th></tr></thead>
+        <tbody id="board"></tbody>
+      </table></div>
+    </div>
 
     <h2 data-t="yourResult"></h2>
     <div class="panel">
       <div data-t="accuracy"></div>
       <div class="big" id="accuracy"></div>
       <div id="accuracy-detail" class="runline"></div>
-      <div class="actions">
+      <div class="actions contest-only">
         <button type="button" class="primary" id="next" data-t="nextSession"></button>
+        <button type="button" class="secondary" id="back2" data-t="backToRooms"></button>
         <span class="note"><span data-t="nextAt"></span> <span id="next-clock"></span></span>
       </div>
     </div>

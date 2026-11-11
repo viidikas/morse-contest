@@ -5,6 +5,7 @@ import { KOCH_ORDER, kochChars, makeTiming, buildTimeline, type Timeline } from 
 import { makeRng, randomGroups } from '../engine/content.js';
 import { scoreGroup, type GroupScore } from '../engine/score.js';
 import { MorsePlayer } from './player.js';
+import { initChart } from './chart.js';
 import { t, type Key, type Lang } from './i18n.js';
 import { $, formatDuration, renderResult } from './results.js';
 
@@ -40,6 +41,7 @@ function saveSettings(s: Settings): void {
 
 const settings = loadSettings();
 const player = new MorsePlayer();
+const chart = initChart();
 
 const views = { setup: $('view-setup'), run: $('view-run'), result: $('view-result') };
 function show(view: keyof typeof views): void {
@@ -58,6 +60,7 @@ function applyLanguage(): void {
     b.setAttribute('aria-pressed', String(b.dataset.lang === settings.lang));
   });
   document.title = t('title', settings.lang);
+  chart.setLabels(t('chartTitle', settings.lang), t('chartShow', settings.lang), t('chartHide', settings.lang));
   updateDerived();
   if (lastScores) showResult(lastScores);
 }
@@ -87,6 +90,7 @@ function updateDerived(): void {
     if (out) out.textContent = settings[f.key].toFixed(f.digits);
   }
   $('chars').textContent = [...kochChars(settings.level)].join(' ');
+  chart.setActive(kochChars(settings.level));
   $('duration').textContent = formatDuration(currentTimeline(1).timeline.totalMs);
 }
 

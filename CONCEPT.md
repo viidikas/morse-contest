@@ -10,12 +10,13 @@ A web platform for learning Morse code by ear, where practice is a shared, timed
 ## 2. What a participant experiences
 
 1. **Sign in** with a Google account. On first sign-in, picks a display name (a callsign is fine) and a language, Estonian or English.
-2. **Lobby.** Sees the schedule of fixed session times, the next session, a countdown, and who else has joined. Does a sound check here: plays a test tone, sets volume and pitch, and types a few practice characters so the keyboard and audio are confirmed working before the start.
-3. **Start.** At 0:00 the feed begins for everyone at the same moment.
-4. **Copying.** Morse plays in groups (5 random characters, a word, or a callsign) with a pause after each. The participant types the group and it is locked in when the next group begins. No corrections after that. The screen shows only progress and time left, not whether the answers were right, and not other people's scores.
-5. **Breaks.** The 30 minutes are split into rounds with short pauses (see section 4).
-6. **Result.** Immediately after the last round: own score, accuracy, the sent text next to the typed text with errors highlighted, and a per-character breakdown ("you confuse B and D", "you miss Q").
-7. **Scoreboard.** Ranking of everyone in the session, plus a long-term table across sessions.
+2. **Choose a room.** Picks a level. The beginner room is open to everyone; harder rooms are locked until their solo qualification test is passed (section 5).
+3. **Lobby.** Sees the schedule of fixed session times, the next session, a countdown, and who else has joined. Does a sound check here: plays a test tone, sets volume and pitch, and types a few practice characters so the keyboard and audio are confirmed working before the start.
+4. **Start.** At 0:00 the feed begins for everyone at the same moment.
+5. **Copying.** Morse plays in groups (5 random characters, a word, or a callsign) with a pause after each. The participant types the group and it is locked in when the next group begins. No corrections after that. The screen shows only progress and time left, not whether the answers were right, and not other people's scores.
+6. **Breaks.** The 30 minutes are split into rounds with short pauses (see section 4).
+7. **Result.** Immediately after the last round: own score, accuracy, the sent text next to the typed text with errors highlighted, and a per-character breakdown ("you confuse B and D", "you miss Q").
+8. **Scoreboard.** Ranking of everyone in the session, plus a long-term table across sessions.
 
 ## 3. How "everyone gets the same feed" works
 
@@ -58,8 +59,24 @@ Learners differ enormously: a beginner knows 4 characters at slow spacing, an ex
 
 - Characters are taught in the Koch order (start with two characters, add one at a time).
 - Characters are sent at full speed (about 20 WPM) with extra spacing between them (Farnsworth timing), so learners hear each character as a sound shape and never count dits.
-- Example rooms: **Beginner** (first 10 characters, wide spacing), **Intermediate** (all letters and digits, 12 WPM effective), **Advanced** (full set with punctuation, 20+ WPM, callsigns).
-- A participant picks a room; the system suggests moving up after consistently scoring above about 90%.
+
+| Room | Characters | Speed (character / overall) | Who may join |
+|---|---|---|---|
+| Beginner | first 10 of the Koch order | 20 / 8 WPM | Everyone |
+| Intermediate | first 20 | 20 / 12 WPM | Those who passed the intermediate test |
+| Advanced | all 41 (letters, digits, punctuation) | 20 / 18 WPM | Those who passed the advanced test |
+
+**Decided: qualification.** The beginner room is open to everyone. A harder room opens only after passing its qualification test alone:
+
+- The test is taken solo, at the room's own character set and speed, and is run and scored by the server like a contest session.
+- Every character of the room is sent the same number of times (about 100 characters in total), so all of them are actually tested.
+- At least 75% of the characters must be copied correctly. The test can be retaken as often as needed.
+- A pass for a harder room also opens the easier ones.
+- Until accounts exist, the proof of passing is a signed token kept in the browser, valid for 180 days. Once sign-in is built it will be stored with the account instead.
+
+The numbers (characters per room, speeds, the 75% threshold) are settings in one file and easy to change.
+
+**Decided: Morse table.** The full Morse table is shown beside the page and can be hidden so it does not distract; the choice is remembered. Characters not used in the current room are dimmed.
 
 The alternative is a single feed for everyone that climbs in difficulty, where beginners simply drop off partway. Simpler to build, worse for learning.
 

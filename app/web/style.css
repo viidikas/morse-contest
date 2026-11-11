@@ -56,3 +56,38 @@ tr.you td { font-weight: 700; }
 .muted { color: var(--muted); }
 nav.pages { margin-top: 28px; font-size: 0.9rem; }
 nav.pages a { color: var(--muted); }
+
+/* Mode: a shared contest session or a solo qualification test */
+body[data-mode="test"] .contest-only { display: none; }
+body[data-mode="contest"] .test-only { display: none; }
+
+/* Room cards */
+.levels { display: grid; gap: 12px; }
+.level { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+.level h3 { margin: 0 0 2px; font-size: 1.1rem; }
+.level .meta { color: var(--muted); font-size: 0.9rem; }
+.level .level-chars { font-size: 0.85rem; color: var(--muted); margin: 8px 0; overflow-wrap: anywhere; }
+.level .rule { margin: 8px 0 0; font-size: 0.95rem; }
+.level.locked { border-style: dashed; }
+.level .actions { margin-top: 12px; }
+.verdict { font-size: 1.15rem; font-weight: 600; margin: 0; }
+.verdict.pass { color: var(--ok); }
+.verdict.fail { color: var(--bad); }
+button.link { background: none; border: none; padding: 0; font: inherit; font-size: 0.9rem; color: var(--muted); text-decoration: underline; cursor: pointer; }
+
+/* Morse table beside the page */
+#chart { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 16px; }
+#chart h2 { margin: 0 0 10px; font-size: 0.95rem; }
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 3px 12px; }
+.chart-cell { display: flex; align-items: center; gap: 10px; min-height: 22px; }
+.chart-cell.inactive { opacity: 0.28; }
+.chart-char { width: 1.1em; font-weight: 700; letter-spacing: 0; }
+.chart-code { display: inline-flex; align-items: center; gap: 3px; }
+.chart-code i { display: inline-block; height: 6px; border-radius: 3px; background: currentColor; }
+.chart-code .dit { width: 6px; }
+.chart-code .dah { width: 16px; }
+@media (min-width: 1040px) {
+  #chart { position: fixed; top: 16px; right: 16px; bottom: 16px; width: 256px; margin: 0; overflow-y: auto; }
+  .chart-grid { grid-template-columns: 1fr 1fr; }
+  body.chart-open { padding-right: 288px; }
+}

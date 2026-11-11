@@ -1,18 +1,23 @@
-// Contest page: join a room, wait in the lobby, copy the shared feed in sync
-// with everyone else, then see the scoreboard.
+// Contest page: choose a room, wait in the lobby, copy the shared feed in
+// sync with everyone else, then see the scoreboard. The same run loop also
+// drives the solo qualification test that unlocks the harder rooms.
 
 import { makeTiming, buildTimeline, type Timing } from '../engine/morse.js';
 import type { GroupScore } from '../engine/score.js';
+import { levelRank } from '../engine/levels.js';
 import { MorsePlayer } from './player.js';
+import { initChart } from './chart.js';
 import { t, type Key, type Lang } from './i18n.js';
 import { $, el, formatDuration, renderResult } from './results.js';
 
-// ---------- shapes of the server's answers (see server/room.ts)
+// ---------- shapes of the server's answers (see server/room.ts and contest.ts)
 
 interface Slot { index: number; text: string; startMs: number; deadlineMs: number }
 interface State {
   now: number;
   phase: 'lobby' | 'running' | 'finished';
+  level: string;
+  solo: boolean;
   startAt: number;
   totalMs: number;
   groupCount: number;
@@ -24,20 +29,42 @@ interface State {
   groups: Slot[];
 }
 interface BoardRow { rank: number; name: string; correct: number; total: number; accuracy: number; you: boolean }
-type Result =
-  | { ready: false }
-  | { ready: true; scores: GroupScore[]; attemptedFrom: number; board: BoardRow[]; nextStartAt: number };
+interface ReadyResult {
+  ready: true;
+  level: string;
+  solo: boolean;
+  scores: GroupScore[];
+  attemptedFrom: number;
+  accuracy: number;
+  board: BoardRow[];
+  nextStartAt: number;
+  passed?: boolean;
+  threshold?: number;
+  pass?: string;
+}
+type Result = { ready: false } | ReadyResult;
+interface LevelInfo {
+  id: string;
+  chars: string;
+  charWpm: number;
+  effWpm: number;
+  requiresTest: boolean;
+  startAt: number;
+  running: boolean;
+  people: number;
+}
+interface Levels { now: number; passAccuracy: number; levels: LevelInfo[] }
 
 // ---------- small persistent preferences
 
-interface Prefs { lang: Lang; name: string; pitch: number; volume: number }
+interface Prefs { lang: Lang; name: string; pitch: number; volume: number; passes: Record<string, string> }
 const PREFS_KEY = 'morse-contest-prefs';
 const TOKEN_KEY = 'morse-contest-token'; // per tab, so two tabs are two participants
 
 function loadPrefs(): Prefs {
   const base: Prefs = {
     lang: navigator.language.toLowerCase().startsWith('et') ? 'et' : 'en',
-    name: '', pitch: 600, volume: 0.5,
+    name: '', pitch: 600, volume: 0.5, passes: {},
   };
   try {
     const raw = localStorage.getItem(PREFS_KEY);
@@ -62,6 +89,15 @@ function setToken(value: string): void {
 let memoryToken = '';
 const prefs = loadPrefs();
 const player = new MorsePlayer();
+const chart = initChart();
+
+/** The stored pass that opens a room: one for that level or for a harder one. */
+function passFor(levelId: string): string {
+  const best = Object.keys(prefs.passes)
+    .filter((id) => levelRank(id) >= levelRank(levelId))
+    .sort((a, b) => levelRank(b) - levelRank(a))[0];
+  return best ? prefs.passes[best] : '';
+}
 
 // ---------- server clock
 
@@ -111,6 +147,13 @@ function show(next: View): void {
   updateSoundWarning();
 }
 
+const LEVEL_NAME: Record<string, Key> = {
+  beginner: 'levelBeginner', mid: 'levelMid', advanced: 'levelAdvanced',
+};
+const levelName = (id: string): string => (LEVEL_NAME[id] ? t(LEVEL_NAME[id], prefs.lang) : id);
+const fill = (text: string, values: Record<string, string | number>): string =>
+  text.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ''));
+
 function applyLanguage(): void {
   document.documentElement.lang = prefs.lang;
   document.querySelectorAll<HTMLElement>('[data-t]').forEach((node) => {
@@ -121,6 +164,8 @@ function applyLanguage(): void {
     b.setAttribute('aria-pressed', String(b.dataset.lang === prefs.lang));
   });
   document.title = t('contestTitle', prefs.lang);
+  chart.setLabels(t('chartTitle', prefs.lang), t('chartShow', prefs.lang), t('chartHide', prefs.lang));
+  if (lastLevels) renderLevels(lastLevels);
   if (lastState) renderLobby(lastState);
   if (lastResult) renderBoard(lastResult);
 }
@@ -132,15 +177,83 @@ function updateSoundWarning(): void {
   $('sound-off').hidden = player.isReady || view === 'join' || view === 'result' || view === 'wait';
 }
 
+// ---------- choosing a room
+
+let lastLevels: Levels | null = null;
+let levelsTimer: number | undefined;
+
+async function loadLevels(): Promise<void> {
+  window.clearTimeout(levelsTimer);
+  if (view !== 'join') return;
+  try {
+    const { data } = await call<Levels>('GET', 'levels');
+    $('net-error').hidden = true;
+    // Redraw only when something changed, so buttons keep keyboard focus.
+    const changed = JSON.stringify(data.levels) !== JSON.stringify(lastLevels?.levels);
+    lastLevels = data;
+    if (changed) renderLevels(data);
+  } catch {
+    $('net-error').hidden = false;
+  }
+  levelsTimer = window.setTimeout(() => void loadLevels(), 5000);
+}
+
+function renderLevels(data: Levels): void {
+  const lang = prefs.lang;
+  const box = $('levels');
+  box.replaceChildren();
+  for (const level of data.levels) {
+    const open = !level.requiresTest || passFor(level.id) !== '';
+    const card = el('div', open ? 'level' : 'level locked', '');
+    card.append(
+      el('h3', '', levelName(level.id)),
+      el('div', 'meta', `${level.chars.length} ${t('characters', lang)} · ${level.charWpm} / ${level.effWpm} WPM`),
+      el('div', 'level-chars mono', [...level.chars].join(' ')),
+      el('div', 'meta',
+        `${level.running ? t('runningNow', lang) : `${t('nextStart', lang)} ${clock(level.startAt)}`}` +
+        ` · ${level.people} ${t('inRoomCount', lang)}`),
+    );
+
+    let rule: string;
+    if (!level.requiresTest) rule = t('openToAll', lang);
+    else if (open) rule = t('qualified', lang);
+    else rule = fill(t('locked', lang), { n: level.chars.length, p: Math.round(data.passAccuracy * 100) });
+    card.append(el('p', 'rule', rule));
+
+    const actions = el('div', 'actions', '');
+    if (open) {
+      const join = el('button', 'primary', `${t('join', lang)}: ${levelName(level.id)}`) as HTMLButtonElement;
+      join.type = 'button';
+      join.addEventListener('click', () => void joinLevel(level.id));
+      actions.append(join);
+    }
+    if (level.requiresTest) {
+      const test = el('button', open ? 'secondary' : 'primary', t(open ? 'retakeTest' : 'takeTest', lang)) as HTMLButtonElement;
+      test.type = 'button';
+      test.addEventListener('click', () => void startTest(level.id));
+      actions.append(test);
+    }
+    card.append(actions);
+    box.append(card);
+  }
+}
+
+function joinError(key: Key | null): void {
+  const node = $('join-error');
+  node.hidden = key === null;
+  if (key) node.textContent = t(key, prefs.lang);
+}
+
 // ---------- session state
 
 let lastState: State | null = null;
-let lastResult: (Result & { ready: true }) | null = null;
+let lastResult: ReadyResult | null = null;
 let slots: Slot[] = []; // groups received so far, by index
 let scheduled = 0; // number of groups already handed to the audio player
 let current = -1; // index of the group now being sent
 let timing: Timing | null = null;
 let joinedLate = false;
+let lastLevelId = 'beginner';
 let pollTimer: number | undefined;
 let tickTimer: number | undefined;
 
@@ -158,10 +271,14 @@ function reset(): void {
 
 function toJoin(): void {
   reset();
+  lastResult = null;
   setToken('');
+  document.body.dataset.mode = 'contest';
+  chart.setActive(null);
   $<HTMLInputElement>('name').value = prefs.name;
   show('join');
-  $<HTMLInputElement>('name').focus();
+  if (lastLevels) renderLevels(lastLevels); // a newly earned pass may have unlocked a room
+  void loadLevels();
 }
 
 async function poll(): Promise<void> {
@@ -188,6 +305,9 @@ function onState(s: State): void {
   for (const g of s.groups) slots[g.index] = g;
   if (first) {
     joinedLate = s.phase === 'running';
+    lastLevelId = s.level;
+    document.body.dataset.mode = s.solo ? 'test' : 'contest';
+    chart.setActive(s.chars);
     $<HTMLProgressElement>('progress').max = s.totalMs;
     tickTimer = window.setInterval(tick, 25);
   }
@@ -279,6 +399,10 @@ async function finish(): Promise<void> {
       $('net-error').hidden = true;
       if (status === 401) return toJoin();
       if (data.ready) {
+        if (data.solo && data.pass) {
+          prefs.passes[data.level] = data.pass;
+          savePrefs();
+        }
         lastResult = data;
         renderBoard(data);
         show('result');
@@ -291,9 +415,17 @@ async function finish(): Promise<void> {
   }
 }
 
-function renderBoard(r: Result & { ready: true }): void {
+function renderBoard(r: ReadyResult): void {
   renderResult(r.scores, prefs.lang, r.attemptedFrom);
   $('next-clock').textContent = clock(r.nextStartAt);
+
+  if (r.solo) {
+    const verdict = $('test-verdict');
+    const values = { a: Math.round(r.accuracy * 100), p: Math.round((r.threshold ?? 0) * 100) };
+    verdict.textContent = fill(t(r.passed ? 'testPassed' : 'testFailed', prefs.lang), values);
+    verdict.className = `verdict ${r.passed ? 'pass' : 'fail'}`;
+    return;
+  }
   const board = $('board');
   board.replaceChildren();
   for (const row of r.board) {
@@ -311,24 +443,57 @@ function renderBoard(r: Result & { ready: true }): void {
 
 // ---------- actions
 
-async function join(name: string): Promise<void> {
-  const error = $('join-error');
-  error.hidden = true;
+/** We are inside a click here, so the browser allows sound to be switched on. */
+async function soundOn(): Promise<void> {
+  try { await player.ready(); } catch { /* the lobby shows a button to turn sound on */ }
+}
+
+async function enter(token: string): Promise<void> {
+  window.clearTimeout(levelsTimer);
+  setToken(token);
+  await syncClock();
+  void poll();
+}
+
+async function joinLevel(levelId: string): Promise<void> {
+  const name = $<HTMLInputElement>('name').value.trim();
+  if (!name) {
+    joinError('nameRequired');
+    $<HTMLInputElement>('name').focus();
+    return;
+  }
+  joinError(null);
+  await soundOn();
   try {
-    await player.ready(); // we are inside a click, so the browser allows sound
-  } catch { /* the lobby shows a button to turn sound on */ }
-  try {
-    const { data } = await call<{ token?: string; error?: string }>('POST', 'join', { name });
+    const { data } = await call<{ token?: string; error?: string }>('POST', 'join', {
+      name, level: levelId, pass: passFor(levelId),
+    });
     if (!data.token) {
-      error.textContent = t(data.error === 'room-full' ? 'roomFull' : 'nameRequired', prefs.lang);
-      error.hidden = false;
+      if (data.error === 'not-qualified') {
+        // The stored pass was not accepted (expired, or the server's key changed).
+        for (const id of Object.keys(prefs.passes)) {
+          if (levelRank(id) >= levelRank(levelId)) delete prefs.passes[id];
+        }
+        savePrefs();
+        if (lastLevels) renderLevels(lastLevels);
+        joinError('notQualified');
+      } else joinError(data.error === 'room-full' ? 'roomFull' : 'nameRequired');
       return;
     }
     prefs.name = name;
     savePrefs();
-    setToken(data.token);
-    await syncClock();
-    void poll();
+    await enter(data.token);
+  } catch {
+    $('net-error').hidden = false;
+  }
+}
+
+async function startTest(levelId: string): Promise<void> {
+  joinError(null);
+  await soundOn();
+  try {
+    const { data } = await call<{ token?: string }>('POST', 'qualify', { level: levelId });
+    if (data.token) await enter(data.token);
   } catch {
     $('net-error').hidden = false;
   }
@@ -362,18 +527,16 @@ document.querySelectorAll<HTMLButtonElement>('[data-lang]').forEach((b) => {
     applyLanguage();
   });
 });
-$('join-form').addEventListener('submit', (e) => {
-  e.preventDefault();
-  void join($<HTMLInputElement>('name').value);
-});
 $('test-tone').addEventListener('click', testTone);
 $('enable-sound').addEventListener('click', () => void player.ready().then(updateSoundWarning));
 $('next').addEventListener('click', () => {
-  lastResult = null;
-  reset();
-  setToken('');
-  void join(prefs.name);
+  const levelId = lastLevelId;
+  toJoin();
+  void joinLevel(levelId);
 });
+$('back').addEventListener('click', toJoin);
+$('back2').addEventListener('click', toJoin);
+$('name').addEventListener('input', () => joinError(null));
 $('answer').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') e.preventDefault();
 });

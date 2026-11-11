@@ -1,5 +1,8 @@
 // Room logic tests. Run with: npm test
 import { Room, type RoomConfig } from '../server/room.js';
+import { Contest } from '../server/contest.js';
+import { LEVELS, PASS_ACCURACY, type LevelDef } from '../engine/levels.js';
+import { makeRng, coverageGroups } from '../engine/content.js';
 
 declare const process: { exitCode?: number };
 
@@ -14,11 +17,12 @@ function check(name: string, cond: boolean, detail: string = ''): void {
 }
 
 const cfg: RoomConfig = {
-  intervalMs: 120_000, minLobbyMs: 15_000, level: 4, charWpm: 20, effWpm: 20,
-  pauseMs: 2000, groupCount: 5, lookaheadMs: 8000, graceMs: 2000,
+  intervalMs: 120_000, minLobbyMs: 15_000, pauseMs: 2000, groupCount: 5,
+  lookaheadMs: 8000, graceMs: 2000, soloLeadMs: 4000,
 };
+const LEVEL: LevelDef = { id: 'beginner', charCount: 4, charWpm: 20, effWpm: 20, requiresTest: false };
 let n = 0;
-const makeRoom = () => new Room(cfg, () => `tok${++n}`, () => 7);
+const makeRoom = () => new Room(LEVEL, cfg, () => `tok${++n}`, () => 7);
 const tokenOf = (r: { token: string } | { error: string }): string => ('token' in r ? r.token : '');
 
 // --- scheduling and joining
@@ -108,6 +112,57 @@ check('new join after the end gets the next session', room.state(next, end + 300
 // --- housekeeping
 room.prune(end + 61 * 60_000);
 check('old sessions are forgotten', room.state(a, end + 61 * 60_000, 0) === null);
+
+// --- qualification test content
+const cov = coverageGroups(makeRng(3), 'KMURESNAPT', 3);
+check('coverage: whole groups of five', cov.length === 6 && cov.every((x) => x.length === 5));
+check('coverage: every character three times', [...'KMURESNAPT'].every((ch) => cov.join('').split(ch).length - 1 === 3));
+const padded = coverageGroups(makeRng(3), 'KMU', 3).join('');
+check('coverage: padded to whole groups', padded.length === 10 && [...'KMU'].every((ch) => padded.split(ch).length - 1 >= 3));
+
+// --- levels and qualification
+const contest = new Contest(cfg, () => `c${++n}`, () => 11, (data) => `sig(${data})`);
+const t0 = T + 5000;
+const info = contest.levels(t0);
+check('three levels listed', info.levels.length === 3 && info.levels[0].id === 'beginner');
+check('levels share the start time', info.levels.every((l) => l.startAt === info.levels[0].startAt));
+check('beginner is open to everyone', 'token' in contest.join('beginner', 'Ann', '', t0));
+check('mid is locked without a pass', (contest.join('mid', 'Ann', '', t0) as { error: string }).error === 'not-qualified');
+check('unknown level is refused', (contest.join('nope', 'Ann', '', t0) as { error: string }).error === 'unknown-level');
+check('no test for beginner', 'error' in contest.qualify('beginner', t0));
+
+const midLevel = LEVELS.find((l) => l.id === 'mid')!;
+function runTest(copyShare: number): { passed?: boolean; pass?: string } {
+  const tok = tokenOf(contest.qualify('mid', t0));
+  const first = contest.state(tok, t0, 0)!;
+  const endAt = first.startAt + first.totalMs;
+  const every = contest.state(tok, endAt - 1, 0)!.groups;
+  every.forEach((slot, i) => {
+    if (i < Math.round(every.length * copyShare)) contest.answer(tok, slot.index, slot.text, first.startAt + slot.deadlineMs);
+  });
+  check('test is private', first.solo && first.participants.length === 1);
+  check('test starts a few seconds after asking', first.startAt === t0 + cfg.soloLeadMs);
+  check('test covers every character five times',
+    [...first.chars].every((ch) => every.map((x) => x.text).join('').split(ch).length - 1 === 5));
+  check('test uses the level characters', first.chars.length === midLevel.charCount);
+  return contest.result(tok, endAt + cfg.graceMs) as { passed?: boolean; pass?: string };
+}
+const fail = runTest(PASS_ACCURACY - 0.1);
+check('below the threshold fails', fail.passed === false && fail.pass === undefined);
+const ok = runTest(PASS_ACCURACY + 0.05);
+check('above the threshold passes', ok.passed === true && typeof ok.pass === 'string');
+const pass = ok.pass ?? '';
+const opened = contest.join('mid', 'Ann', pass, t0);
+check('pass opens mid', 'token' in opened, JSON.stringify(opened) + ' pass=' + pass);
+check('mid pass does not open advanced', 'error' in contest.join('advanced', 'Ann', pass, t0));
+check('advanced pass opens mid', contest.passAllows(contest.makePass('advanced', t0), 'mid', t0));
+check('tampered pass is refused', 'error' in contest.join('mid', 'Ann', pass.replace('mid', 'advanced'), t0));
+check('forged signature is refused', 'error' in contest.join('mid', 'Ann', pass.slice(0, -2) + 'xx', t0));
+check('expired pass is refused', !contest.passAllows(pass, 'mid', t0 + 181 * 24 * 3600 * 1000));
+check('garbage pass is refused', !contest.passAllows('hello', 'mid', t0) && !contest.passAllows('', 'mid', t0));
+const midTok = tokenOf(contest.join('mid', 'Bob', pass, t0));
+check('state is routed to the right room', contest.state(midTok, t0, 0)!.level === 'mid');
+check('shared session is not solo', contest.state(midTok, t0, 0)!.solo === false);
 
 console.log(`${passed} passed, ${failed} failed`);
 if (failed) process.exitCode = 1;

@@ -44,3 +44,24 @@ export function randomGroups(rng: Rng, chars: string, opts: GroupOptions): strin
   }
   return groups;
 }
+
+/**
+ * Groups in which every character of `chars` appears exactly `repeats` times,
+ * in random order. Used for qualification tests, where each character must be
+ * tested. If the total does not divide into whole groups, the last group is
+ * filled with random characters.
+ */
+export function coverageGroups(rng: Rng, chars: string, repeats: number, groupLength: number = 5): string[] {
+  const set = [...chars];
+  if (set.length === 0) throw new Error('No characters to draw from');
+  const pool: string[] = [];
+  for (let r = 0; r < repeats; r++) pool.push(...set);
+  while (pool.length % groupLength !== 0) pool.push(set[Math.floor(rng() * set.length)]);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const groups: string[] = [];
+  for (let i = 0; i < pool.length; i += groupLength) groups.push(pool.slice(i, i + groupLength).join(''));
+  return groups;
+}

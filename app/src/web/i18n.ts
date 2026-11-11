@@ -80,6 +80,43 @@ const TEXT = {
   yourResult: { en: 'Your result', et: 'Sinu tulemus' },
   nextSession: { en: 'Join the next session', et: 'Liitu järgmise sessiooniga' },
   nextAt: { en: 'Next session at', et: 'Järgmine sessioon kell' },
+  chartTitle: { en: 'Morse table', et: 'Morsetabel' },
+  chartShow: { en: 'Show Morse table', et: 'Näita morsetabelit' },
+  chartHide: { en: 'Hide Morse table', et: 'Peida morsetabel' },
+  chooseLevel: { en: 'Choose a room', et: 'Vali ruum' },
+  levelBeginner: { en: 'Beginner', et: 'Algaja' },
+  levelMid: { en: 'Intermediate', et: 'Kesktase' },
+  levelAdvanced: { en: 'Advanced', et: 'Edasijõudnu' },
+  characters: { en: 'characters', et: 'märki' },
+  openToAll: { en: 'Open to everyone.', et: 'Avatud kõigile.' },
+  qualified: { en: 'You have qualified.', et: 'Oled kvalifitseerunud.' },
+  locked: {
+    en: 'Locked. First pass the test alone: copy all {n} characters with at least {p}% accuracy.',
+    et: 'Lukus. Soorita enne üksi test: trüki kõik {n} märki vähemalt {p}% täpsusega.',
+  },
+  takeTest: { en: 'Take the test', et: 'Tee test' },
+  retakeTest: { en: 'Take the test again', et: 'Tee test uuesti' },
+  nextStart: { en: 'Next start', et: 'Järgmine algus' },
+  runningNow: { en: 'Running now', et: 'Käib praegu' },
+  inRoomCount: { en: 'in the room', et: 'ruumis' },
+  notQualified: {
+    en: 'Your test result is no longer valid for this room. Please take the test again.',
+    et: 'Sinu testitulemus selle ruumi jaoks enam ei kehti. Palun tee test uuesti.',
+  },
+  testStartsIn: { en: 'Test starts in', et: 'Test algab' },
+  testIntro: {
+    en: 'Qualification test: every character of this room is sent the same number of times.',
+    et: 'Kvalifikatsioonitest: iga selle ruumi märk saadetakse sama arv kordi.',
+  },
+  testPassed: {
+    en: 'Passed: {a}% (needed {p}%). The room is now open to you.',
+    et: 'Sooritatud: {a}% (vaja {p}%). Ruum on sulle nüüd avatud.',
+  },
+  testFailed: {
+    en: 'Not yet: {a}% (needed {p}%). Practise and try again.',
+    et: 'Veel mitte: {a}% (vaja {p}%). Harjuta ja proovi uuesti.',
+  },
+  backToRooms: { en: 'Back to the rooms', et: 'Tagasi ruumide juurde' },
 } as const;
 
 export type Key = keyof typeof TEXT;

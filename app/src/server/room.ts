@@ -1,24 +1,29 @@
-// Session logic for one room. Pure: the current time and the random sources
-// are passed in, so the same code can be tested without a clock or a network.
+// Session logic for one room (one level). Pure: the current time and the
+// random sources are passed in, so the same code can be tested without a
+// clock or a network.
+//
+// A room runs two kinds of sessions:
+//  - shared sessions, starting on the clock, that anyone admitted may join;
+//  - solo sessions, started on request for one person: the qualification test.
 
-import { kochChars, makeTiming, buildTimeline, type Timeline } from '../engine/morse.js';
-import { makeRng, randomGroups } from '../engine/content.js';
+import { makeTiming, buildTimeline, type Timeline } from '../engine/morse.js';
+import { makeRng, randomGroups, coverageGroups } from '../engine/content.js';
 import { scoreGroup, type GroupScore } from '../engine/score.js';
+import { levelChars, testRepeats, type LevelDef } from '../engine/levels.js';
 
 export interface RoomConfig {
-  /** Sessions start on the clock at multiples of this interval. */
+  /** Shared sessions start on the clock at multiples of this interval. */
   intervalMs: number;
   /** A session is never scheduled sooner than this, so there is time to join. */
   minLobbyMs: number;
-  level: number;
-  charWpm: number;
-  effWpm: number;
   pauseMs: number;
   groupCount: number;
   /** How far ahead of playback group text is handed to browsers. */
   lookaheadMs: number;
   /** Answers are accepted this long after a group's deadline (network delay). */
   graceMs: number;
+  /** Delay between asking for a solo test and its first tone. */
+  soloLeadMs: number;
 }
 
 interface Participant {
@@ -32,6 +37,7 @@ interface Participant {
 
 interface Session {
   startAt: number;
+  solo: boolean;
   groups: string[];
   timeline: Timeline;
   participants: Map<string, Participant>;
@@ -42,6 +48,8 @@ export type Phase = 'lobby' | 'running' | 'finished';
 export interface StateView {
   now: number;
   phase: Phase;
+  level: string;
+  solo: boolean;
   startAt: number;
   totalMs: number;
   groupCount: number;
@@ -64,9 +72,25 @@ export interface BoardRow {
   you: boolean;
 }
 
-export type ResultView =
-  | { ready: false }
-  | { ready: true; scores: GroupScore[]; attemptedFrom: number; board: BoardRow[]; nextStartAt: number };
+export interface ReadyResult {
+  ready: true;
+  level: string;
+  solo: boolean;
+  scores: GroupScore[];
+  attemptedFrom: number;
+  /** Own accuracy over the groups attended, 0..1. */
+  accuracy: number;
+  board: BoardRow[];
+  nextStartAt: number;
+}
+export type ResultView = { ready: false } | ReadyResult;
+
+export interface RoomInfo {
+  startAt: number;
+  running: boolean;
+  /** People in the session that is running or about to start. */
+  people: number;
+}
 
 const ONLINE_MS = 6000;
 const KEEP_MS = 60 * 60 * 1000;
@@ -75,52 +99,87 @@ const MAX_ANSWER = 20;
 const MAX_PARTICIPANTS = 500;
 
 export class Room {
-  private sessions = new Map<number, Session>();
+  private shared = new Map<number, Session>();
+  private solos = new Set<Session>();
   private byToken = new Map<string, Session>();
 
   constructor(
+    readonly level: LevelDef,
     private cfg: RoomConfig,
     private makeToken: () => string,
     private makeSeed: () => number,
   ) {}
 
-  /** The running session if there is one, otherwise the next one to start. */
+  /** The running shared session if there is one, otherwise the next one to start. */
   private activeSession(now: number): Session {
     let upcoming: Session | undefined;
-    for (const s of this.sessions.values()) {
+    for (const s of this.shared.values()) {
       if (s.startAt <= now && now < s.startAt + s.timeline.totalMs) return s;
       if (s.startAt > now && (!upcoming || s.startAt < upcoming.startAt)) upcoming = s;
     }
-    return upcoming ?? this.create(this.nextStart(now));
+    return upcoming ?? this.createShared(this.nextStart(now));
   }
 
   private nextStart(now: number): number {
     return Math.ceil((now + this.cfg.minLobbyMs) / this.cfg.intervalMs) * this.cfg.intervalMs;
   }
 
-  private create(startAt: number): Session {
+  private build(startAt: number, solo: boolean, groups: string[]): Session {
+    const timing = makeTiming(this.level.charWpm, this.level.effWpm);
+    const timeline = buildTimeline(groups, timing, this.cfg.pauseMs);
+    return { startAt, solo, groups, timeline, participants: new Map() };
+  }
+
+  private createShared(startAt: number): Session {
     const c = this.cfg;
-    const groups = randomGroups(makeRng(this.makeSeed()), kochChars(c.level), {
+    const groups = randomGroups(makeRng(this.makeSeed()), levelChars(this.level), {
       count: c.groupCount,
       newestWeight: 2,
     });
-    const timeline = buildTimeline(groups, makeTiming(c.charWpm, c.effWpm), c.pauseMs);
-    if (timeline.totalMs + c.graceMs + c.minLobbyMs > c.intervalMs) {
-      throw new Error('Session does not fit in the interval between sessions');
+    const session = this.build(startAt, false, groups);
+    if (session.timeline.totalMs + c.graceMs + c.minLobbyMs > c.intervalMs) {
+      throw new Error(`A ${this.level.id} session does not fit in the interval between sessions`);
     }
-    const session: Session = { startAt, groups, timeline, participants: new Map() };
-    this.sessions.set(startAt, session);
+    this.shared.set(startAt, session);
     return session;
+  }
+
+  private addParticipant(session: Session, name: string, attemptedFrom: number, now: number): string {
+    const token = `${this.level.id}.${this.makeToken()}`;
+    session.participants.set(token, {
+      name,
+      token,
+      answers: new Array<string>(session.groups.length).fill(''),
+      attemptedFrom,
+      lastSeen: now,
+    });
+    this.byToken.set(token, session);
+    return token;
   }
 
   /** Forget sessions that ended long ago. */
   prune(now: number): void {
-    for (const [key, s] of this.sessions) {
-      if (now > s.startAt + s.timeline.totalMs + KEEP_MS) {
-        for (const token of s.participants.keys()) this.byToken.delete(token);
-        this.sessions.delete(key);
+    const old = (s: Session) => now > s.startAt + s.timeline.totalMs + KEEP_MS;
+    const drop = (s: Session) => {
+      for (const token of s.participants.keys()) this.byToken.delete(token);
+    };
+    for (const [key, s] of this.shared) {
+      if (old(s)) {
+        drop(s);
+        this.shared.delete(key);
       }
     }
+    for (const s of this.solos) {
+      if (old(s)) {
+        drop(s);
+        this.solos.delete(s);
+      }
+    }
+  }
+
+  info(now: number): RoomInfo {
+    const s = this.activeSession(now);
+    return { startAt: s.startAt, running: s.startAt <= now, people: s.participants.size };
   }
 
   join(rawName: string, now: number): { token: string } | { error: string } {
@@ -139,16 +198,15 @@ export class Room {
       const next = session.timeline.groups.find((g) => g.startMs >= elapsed);
       attemptedFrom = next ? next.index : session.groups.length;
     }
-    const token = this.makeToken();
-    session.participants.set(token, {
-      name,
-      token,
-      answers: new Array<string>(session.groups.length).fill(''),
-      attemptedFrom,
-      lastSeen: now,
-    });
-    this.byToken.set(token, session);
-    return { token };
+    return { token: this.addParticipant(session, name, attemptedFrom, now) };
+  }
+
+  /** Starts a private qualification test in which every character appears equally often. */
+  startSolo(now: number): { token: string } {
+    const groups = coverageGroups(makeRng(this.makeSeed()), levelChars(this.level), testRepeats(this.level));
+    const session = this.build(now + this.cfg.soloLeadMs, true, groups);
+    this.solos.add(session);
+    return { token: this.addParticipant(session, 'solo', 0, now) };
   }
 
   private phase(s: Session, now: number): Phase {
@@ -167,12 +225,14 @@ export class Room {
     return {
       now,
       phase: this.phase(s, now),
+      level: this.level.id,
+      solo: s.solo,
       startAt: s.startAt,
       totalMs: s.timeline.totalMs,
       groupCount: s.groups.length,
-      charWpm: this.cfg.charWpm,
-      effWpm: this.cfg.effWpm,
-      chars: kochChars(this.cfg.level),
+      charWpm: this.level.charWpm,
+      effWpm: this.level.effWpm,
+      chars: levelChars(this.level),
       you: me.name,
       participants: [...s.participants.values()].map((p) => ({
         name: p.name,
@@ -225,8 +285,11 @@ export class Room {
 
     return {
       ready: true,
+      level: this.level.id,
+      solo: s.solo,
       scores: score(me),
       attemptedFrom: me.attemptedFrom,
+      accuracy: rows.find((r) => r.you)?.accuracy ?? 0,
       board: rows,
       nextStartAt: this.activeSession(now).startAt,
     };

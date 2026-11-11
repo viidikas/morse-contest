@@ -3,37 +3,42 @@
 // WebSockets through.
 
 import * as http from 'node:http';
-import { randomBytes, randomInt } from 'node:crypto';
+import { createHmac, randomBytes, randomInt } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { dirname, extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Room, type RoomConfig } from './room.js';
+import { Contest } from './contest.js';
+import type { RoomConfig } from './room.js';
 
 const env = (name: string, fallback: number): number => {
   const v = Number(process.env[name]);
   return Number.isFinite(v) && process.env[name] !== undefined && process.env[name] !== '' ? v : fallback;
 };
 
-// Defaults are a short practice session every 2 minutes, convenient for
+// Defaults are short practice sessions every 2 minutes, convenient for
 // development. Real sessions are configured through the environment.
 const config: RoomConfig = {
   intervalMs: env('SESSION_EVERY_MIN', 2) * 60_000,
   minLobbyMs: env('MIN_LOBBY_S', 15) * 1000,
-  level: env('LEVEL', 4),
-  charWpm: env('CHAR_WPM', 20),
-  effWpm: env('EFF_WPM', 10),
   pauseMs: env('PAUSE_S', 2.5) * 1000,
   groupCount: env('GROUPS', 10),
   lookaheadMs: 8000,
   graceMs: 2000,
+  soloLeadMs: 4000,
 };
 
-const room = new Room(
+// Qualification passes are signed with this secret. Without PASS_SECRET a
+// random one is used, and passes stop being valid when the server restarts.
+const secret = process.env.PASS_SECRET || randomBytes(32).toString('hex');
+if (!process.env.PASS_SECRET) console.log('PASS_SECRET is not set: qualification passes last until restart.');
+
+const contest = new Contest(
   config,
   () => randomBytes(24).toString('base64url'),
   () => randomInt(0, 2 ** 32),
+  (data) => createHmac('sha256', secret).update(data).digest('base64url'),
 );
-setInterval(() => room.prune(Date.now()), 10 * 60_000).unref();
+setInterval(() => contest.prune(Date.now()), 10 * 60_000).unref();
 
 const appRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 // Only browser code is served. Server code under dist/server stays private.
@@ -79,21 +84,28 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
 
   if (route === 'GET /api/time') return sendJson(res, 200, { now });
 
+  if (route === 'GET /api/levels') return sendJson(res, 200, contest.levels(now));
+
   if (route === 'POST /api/join') {
     const body = await readBody(req);
-    const out = room.join(String(body.name ?? ''), now);
+    const out = contest.join(String(body.level ?? ''), String(body.name ?? ''), String(body.pass ?? ''), now);
+    return sendJson(res, 'error' in out ? 400 : 200, out);
+  }
+  if (route === 'POST /api/qualify') {
+    const body = await readBody(req);
+    const out = contest.qualify(String(body.level ?? ''), now);
     return sendJson(res, 'error' in out ? 400 : 200, out);
   }
   if (route === 'GET /api/state') {
-    const state = room.state(token, now, Number(url.searchParams.get('from') ?? 0));
+    const state = contest.state(token, now, Number(url.searchParams.get('from') ?? 0));
     return state ? sendJson(res, 200, state) : sendJson(res, 401, { error: 'unknown-token' });
   }
   if (route === 'POST /api/answer') {
     const body = await readBody(req);
-    return sendJson(res, 200, room.answer(token, Number(body.index), String(body.text ?? ''), now));
+    return sendJson(res, 200, contest.answer(token, Number(body.index), String(body.text ?? ''), now));
   }
   if (route === 'GET /api/result') {
-    const result = room.result(token, now);
+    const result = contest.result(token, now);
     return result ? sendJson(res, 200, result) : sendJson(res, 401, { error: 'unknown-token' });
   }
   return sendJson(res, 404, { error: 'not-found' });
