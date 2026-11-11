@@ -4,11 +4,11 @@
 
 import { makeTiming, buildTimeline, type Timing } from '../engine/morse.js';
 import type { GroupScore } from '../engine/score.js';
-import { levelRank } from '../engine/levels.js';
 import { MorsePlayer } from './player.js';
 import { initChart } from './chart.js';
 import { t, type Key, type Lang } from './i18n.js';
 import { $, el, formatDuration, renderResult } from './results.js';
+import { fetchMe, fill, levelName as nameOfLevel, renderLogin, renderUserBar, type Me } from './common.js';
 
 // ---------- shapes of the server's answers (see server/room.ts and contest.ts)
 
@@ -40,7 +40,6 @@ interface ReadyResult {
   nextStartAt: number;
   passed?: boolean;
   threshold?: number;
-  pass?: string;
 }
 type Result = { ready: false } | ReadyResult;
 interface LevelInfo {
@@ -49,6 +48,7 @@ interface LevelInfo {
   charWpm: number;
   effWpm: number;
   requiresTest: boolean;
+  open: boolean;
   startAt: number;
   running: boolean;
   people: number;
@@ -57,14 +57,14 @@ interface Levels { now: number; passAccuracy: number; levels: LevelInfo[] }
 
 // ---------- small persistent preferences
 
-interface Prefs { lang: Lang; name: string; pitch: number; volume: number; passes: Record<string, string> }
+interface Prefs { lang: Lang; pitch: number; volume: number }
 const PREFS_KEY = 'morse-contest-prefs';
 const TOKEN_KEY = 'morse-contest-token'; // per tab, so two tabs are two participants
 
 function loadPrefs(): Prefs {
   const base: Prefs = {
     lang: navigator.language.toLowerCase().startsWith('et') ? 'et' : 'en',
-    name: '', pitch: 600, volume: 0.5, passes: {},
+    pitch: 600, volume: 0.5,
   };
   try {
     const raw = localStorage.getItem(PREFS_KEY);
@@ -91,13 +91,7 @@ const prefs = loadPrefs();
 const player = new MorsePlayer();
 const chart = initChart();
 
-/** The stored pass that opens a room: one for that level or for a harder one. */
-function passFor(levelId: string): string {
-  const best = Object.keys(prefs.passes)
-    .filter((id) => levelRank(id) >= levelRank(levelId))
-    .sort((a, b) => levelRank(b) - levelRank(a))[0];
-  return best ? prefs.passes[best] : '';
-}
+let me: Me | null = null;
 
 // ---------- server clock
 
@@ -136,23 +130,18 @@ async function syncClock(): Promise<void> {
 // ---------- views and language
 
 const views = {
-  join: $('view-join'), lobby: $('view-lobby'), run: $('view-run'),
+  login: $('view-login'), join: $('view-join'), lobby: $('view-lobby'), run: $('view-run'),
   wait: $('view-wait'), result: $('view-result'),
 };
 type View = keyof typeof views;
-let view: View = 'join';
+let view: View = 'login';
 function show(next: View): void {
   view = next;
   for (const [name, node] of Object.entries(views)) node.hidden = name !== next;
   updateSoundWarning();
 }
 
-const LEVEL_NAME: Record<string, Key> = {
-  beginner: 'levelBeginner', mid: 'levelMid', advanced: 'levelAdvanced',
-};
-const levelName = (id: string): string => (LEVEL_NAME[id] ? t(LEVEL_NAME[id], prefs.lang) : id);
-const fill = (text: string, values: Record<string, string | number>): string =>
-  text.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ''));
+const levelName = (id: string): string => nameOfLevel(id, prefs.lang);
 
 function applyLanguage(): void {
   document.documentElement.lang = prefs.lang;
@@ -165,6 +154,10 @@ function applyLanguage(): void {
   });
   document.title = t('contestTitle', prefs.lang);
   chart.setLabels(t('chartTitle', prefs.lang), t('chartShow', prefs.lang), t('chartHide', prefs.lang));
+  if (me) {
+    renderUserBar(me, prefs.lang, 'contest');
+    if (!me.user) renderLogin(me, prefs.lang);
+  }
   if (lastLevels) renderLevels(lastLevels);
   if (lastState) renderLobby(lastState);
   if (lastResult) renderBoard(lastResult);
@@ -174,7 +167,7 @@ const clock = (ms: number): string =>
   new Date(ms).toLocaleTimeString(prefs.lang === 'et' ? 'et-EE' : 'en-GB', { hour: '2-digit', minute: '2-digit' });
 
 function updateSoundWarning(): void {
-  $('sound-off').hidden = player.isReady || view === 'join' || view === 'result' || view === 'wait';
+  $('sound-off').hidden = player.isReady || view === 'login' || view === 'join' || view === 'result' || view === 'wait';
 }
 
 // ---------- choosing a room
@@ -186,8 +179,10 @@ async function loadLevels(): Promise<void> {
   window.clearTimeout(levelsTimer);
   if (view !== 'join') return;
   try {
-    const { data } = await call<Levels>('GET', 'levels');
+    const { status, data } = await call<Levels>('GET', 'levels');
     $('net-error').hidden = true;
+    if (status === 401) return toLogin();
+    if (status === 403) return joinError('blockedAccount');
     // Redraw only when something changed, so buttons keep keyboard focus.
     const changed = JSON.stringify(data.levels) !== JSON.stringify(lastLevels?.levels);
     lastLevels = data;
@@ -203,7 +198,7 @@ function renderLevels(data: Levels): void {
   const box = $('levels');
   box.replaceChildren();
   for (const level of data.levels) {
-    const open = !level.requiresTest || passFor(level.id) !== '';
+    const open = level.open;
     const card = el('div', open ? 'level' : 'level locked', '');
     card.append(
       el('h3', '', levelName(level.id)),
@@ -275,7 +270,6 @@ function toJoin(): void {
   setToken('');
   document.body.dataset.mode = 'contest';
   chart.setActive(null);
-  $<HTMLInputElement>('name').value = prefs.name;
   show('join');
   if (lastLevels) renderLevels(lastLevels); // a newly earned pass may have unlocked a room
   void loadLevels();
@@ -286,7 +280,8 @@ async function poll(): Promise<void> {
   try {
     const { status, data } = await call<State>('GET', `state?from=${slots.length}`);
     $('net-error').hidden = true;
-    if (status === 401) return toJoin(); // server restarted or session expired
+    if (status === 401) return toLogin();
+    if (status !== 200) return toJoin(); // server restarted or session expired
     onState(data);
     if (data.phase === 'finished') return; // the tick loop takes it from here
     // In the lobby a slow poll is enough until the start is near.
@@ -397,12 +392,9 @@ async function finish(): Promise<void> {
     try {
       const { status, data } = await call<Result>('GET', 'result');
       $('net-error').hidden = true;
-      if (status === 401) return toJoin();
+      if (status === 401) return toLogin();
+      if (status !== 200) return toJoin();
       if (data.ready) {
-        if (data.solo && data.pass) {
-          prefs.passes[data.level] = data.pass;
-          savePrefs();
-        }
         lastResult = data;
         renderBoard(data);
         show('result');
@@ -456,32 +448,19 @@ async function enter(token: string): Promise<void> {
 }
 
 async function joinLevel(levelId: string): Promise<void> {
-  const name = $<HTMLInputElement>('name').value.trim();
-  if (!name) {
-    joinError('nameRequired');
-    $<HTMLInputElement>('name').focus();
-    return;
-  }
   joinError(null);
   await soundOn();
   try {
-    const { data } = await call<{ token?: string; error?: string }>('POST', 'join', {
-      name, level: levelId, pass: passFor(levelId),
-    });
+    const { status, data } = await call<{ token?: string; error?: string }>('POST', 'join', { level: levelId });
+    if (status === 401) return toLogin();
     if (!data.token) {
-      if (data.error === 'not-qualified') {
-        // The stored pass was not accepted (expired, or the server's key changed).
-        for (const id of Object.keys(prefs.passes)) {
-          if (levelRank(id) >= levelRank(levelId)) delete prefs.passes[id];
-        }
-        savePrefs();
-        if (lastLevels) renderLevels(lastLevels);
-        joinError('notQualified');
-      } else joinError(data.error === 'room-full' ? 'roomFull' : 'nameRequired');
+      const reason: Record<string, Key> = {
+        'not-qualified': 'notQualified', blocked: 'blockedAccount', 'room-full': 'roomFull',
+      };
+      joinError(reason[data.error ?? ''] ?? 'noConnection');
+      void loadLevels();
       return;
     }
-    prefs.name = name;
-    savePrefs();
     await enter(data.token);
   } catch {
     $('net-error').hidden = false;
@@ -492,7 +471,8 @@ async function startTest(levelId: string): Promise<void> {
   joinError(null);
   await soundOn();
   try {
-    const { data } = await call<{ token?: string }>('POST', 'qualify', { level: levelId });
+    const { status, data } = await call<{ token?: string }>('POST', 'qualify', { level: levelId });
+    if (status === 401) return toLogin();
     if (data.token) await enter(data.token);
   } catch {
     $('net-error').hidden = false;
@@ -536,18 +516,39 @@ $('next').addEventListener('click', () => {
 });
 $('back').addEventListener('click', toJoin);
 $('back2').addEventListener('click', toJoin);
-$('name').addEventListener('input', () => joinError(null));
 $('answer').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') e.preventDefault();
 });
 
 // ---------- start
 
-applyLanguage();
-if (getToken()) {
-  // Page reloaded mid-session: pick up where we were.
-  show('lobby');
-  void syncClock().then(poll, () => toJoin());
-} else {
-  toJoin();
+function toLogin(): void {
+  reset();
+  setToken('');
+  if (me) me.user = null;
+  show('login');
+  applyLanguage();
 }
+
+async function start(): Promise<void> {
+  applyLanguage();
+  try {
+    me = await fetchMe();
+  } catch {
+    $('net-error').hidden = false;
+    window.setTimeout(() => void start(), 2000);
+    return;
+  }
+  $('net-error').hidden = true;
+  applyLanguage();
+  if (!me.user) return show('login');
+  if (getToken()) {
+    // Page reloaded mid-session: pick up where we were.
+    show('lobby');
+    void syncClock().then(poll, () => toJoin());
+  } else {
+    toJoin();
+  }
+}
+
+void start();

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My results</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1 data-t="accountTitle">My results</h1>
+    <div class="lang">
+      <button type="button" data-lang="et" aria-pressed="false">ET</button>
+      <button type="button" data-lang="en" aria-pressed="true">EN</button>
+    </div>
+  </header>
+  <nav id="userbar" class="userbar"></nav>
+
+  <section id="view-login" class="panel" hidden>
+    <div id="login-box"></div>
+  </section>
+
+  <section id="view-account" hidden>
+    <h2 data-t="summary"></h2>
+    <div id="stats" class="stats"></div>
+
+    <h2 data-t="weakChars"></h2>
+    <ul id="weak" class="inline-list"></ul>
+    <p class="legend" data-t="weakCharsNote"></p>
+
+    <h2 data-t="history"></h2>
+    <div class="scroll"><table>
+      <thead><tr>
+        <th data-t="colDate"></th><th data-t="colRoom"></th><th data-t="colKind"></th>
+        <th class="num" data-t="points"></th><th class="num" data-t="accuracy"></th><th class="num" data-t="colPlace"></th>
+      </tr></thead>
+      <tbody id="history"></tbody>
+    </table></div>
+
+    <h2 data-t="profile"></h2>
+    <form id="profile-form" class="panel">
+      <div class="field-text">
+        <label for="name" data-t="displayName"></label>
+        <input id="name" type="text" maxlength="20" required>
+      </div>
+      <p class="muted"><span data-t="email"></span>: <span id="email"></span></p>
+      <p class="muted"><span data-t="qualifiedFor"></span>: <span id="level"></span></p>
+      <div class="actions">
+        <button type="submit" class="primary" data-t="save"></button>
+        <span id="save-note" hidden></span>
+      </div>
+    </form>
+  </section>
+</main>
+<script type="module" src="../dist/web/account.js"></script>
+</body>
+</html>

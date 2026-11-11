@@ -15,18 +15,17 @@
       <button type="button" data-lang="en" aria-pressed="true">EN</button>
     </div>
   </header>
+  <nav id="userbar" class="userbar"></nav>
   <p class="lead" data-t="contestIntro"></p>
   <p><button type="button" class="link" id="chart-toggle" aria-controls="chart"></button></p>
   <p id="net-error" class="warn" data-t="noConnection" hidden></p>
 
+  <section id="view-login" class="panel" hidden>
+    <div id="login-box"></div>
+  </section>
+
   <section id="view-join" hidden>
-    <div class="panel">
-      <div class="field-text">
-        <label for="name" data-t="yourName"></label>
-        <input id="name" type="text" maxlength="20" autocomplete="nickname">
-      </div>
-      <p id="join-error" class="warn" hidden></p>
-    </div>
+    <p id="join-error" class="warn" hidden></p>
     <h2 data-t="chooseLevel"></h2>
     <div id="levels" class="levels"></div>
   </section>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>User administration</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wide">
+  <header>
+    <h1 data-t="adminTitle">User administration</h1>
+    <div class="lang">
+      <button type="button" data-lang="et" aria-pressed="false">ET</button>
+      <button type="button" data-lang="en" aria-pressed="true">EN</button>
+    </div>
+  </header>
+  <nav id="userbar" class="userbar"></nav>
+
+  <section id="view-login" class="panel" hidden>
+    <div id="login-box"></div>
+  </section>
+
+  <section id="view-denied" class="panel" hidden>
+    <p class="warn" data-t="adminOnly"></p>
+  </section>
+
+  <section id="view-admin" hidden>
+    <h2><span data-t="users"></span> <span id="user-count" class="muted small"></span></h2>
+    <div class="scroll"><table>
+      <thead><tr>
+        <th data-t="colUser"></th><th data-t="colRole"></th><th data-t="colLevel"></th>
+        <th class="num" data-t="colSessions"></th><th class="num" data-t="statAverage"></th>
+        <th data-t="colLastSeen"></th><th data-t="colStatus"></th><th data-t="colActions"></th>
+      </tr></thead>
+      <tbody id="users"></tbody>
+    </table></div>
+
+    <div id="user-results" hidden>
+      <h2 id="user-results-title"></h2>
+      <div id="user-stats" class="stats"></div>
+      <div class="scroll"><table>
+        <thead><tr>
+          <th data-t="colDate"></th><th data-t="colRoom"></th><th data-t="colKind"></th>
+          <th class="num" data-t="points"></th><th class="num" data-t="accuracy"></th><th class="num" data-t="colPlace"></th>
+        </tr></thead>
+        <tbody id="user-history"></tbody>
+      </table></div>
+    </div>
+  </section>
+</main>
+<script type="module" src="../dist/web/admin.js"></script>
+</body>
+</html>

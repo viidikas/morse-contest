@@ -97,7 +97,7 @@ The server is a **Hetzner Webhosting L** account. This is shared, managed hostin
 |---|---|---|
 | Address | `morse.viljar.ee` (new subdomain) | Hetzner switches off PHP and static sites on a domain when Node.js is enabled for it, so the app must not share a domain with the portfolio at `www.viljar.ee` |
 | Server | One Node.js + TypeScript app, run by us on a local port behind the web server | One language for server and browser |
-| Database | MariaDB (one of the 18 free databases) | Provided and managed by Hetzner |
+| Data | One JSON file on the hosting account, behind a single storage module | Ample for a group of friends, needs no database service, trivial to back up. Can be swapped for MariaDB later without touching the rest (changed from the original MariaDB plan) |
 | Browser | TypeScript + Svelte, Web Audio API | Small pages, precise audio |
 | Client–server traffic | Plain HTTPS requests | WebSockets do not pass through the hosting (tested) |
 | Sign-in | Google sign-in (OAuth) | Decided; no passwords stored by us |
@@ -131,12 +131,22 @@ VS Code on this PC  ──git push──▶  GitHub (private repo)
 - **Code:** written and run locally in VS Code in this folder (`HAM Morse`). The whole app runs on `localhost` for testing, including simulated participants, before anything goes to the hosting account.
 - **Repository:** one private GitHub repo holding the app and this document.
 - **Deploy:** a short script that logs in over SSH, pulls the tagged version, installs dependencies, builds, and restarts the app.
-- **One-time setup in konsoleH:** subdomain and SSL are done. Still to do: create the database.
+- **One-time setup in konsoleH:** subdomain and SSL are done. No database is needed for now.
 - **Secrets** (database password, Google sign-in secret, session signing key) live in a file on the hosting account or in konsoleH's environment variables. They are never put in the repo or in chat.
 
 **candalf is not usable here.** It works by logging in as root to install packages and reconfigure the system, and shared hosting gives no root access. There is also nothing for it to manage, since Hetzner maintains the system. It would only come back into the picture if the project moves to a Hetzner Cloud server.
 
-**Google sign-in needs one setup step from you:** creating an OAuth client in Google Cloud Console for `morse.viljar.ee`, which produces a client ID and a secret.
+**Google sign-in needs one setup step from you:** creating an OAuth client in Google Cloud Console for `morse.viljar.ee`, which produces a client ID and a secret. They are entered on the server with `deploy/configure.sh`, which stores them in a file only the hosting account can read.
+
+### Accounts, saved results and administration
+
+- **Sign-in:** Google only. No passwords are handled or stored by us. Being signed in is remembered for 30 days in a signed cookie.
+- **Account:** created on first sign-in. Holds the display name (a callsign is fine, changeable), the email from Google, the role, the qualification level, and whether the account is blocked.
+- **Saved per account:** every contest session and every qualification test: date, room, points, accuracy, place, and per-character counts. A passed test raises the account's qualification, so it follows the person to any device.
+- **"My results" page:** totals (sessions, average and best accuracy, wins), the characters with the lowest accuracy over all saved sessions, and the full history.
+- **Administration page**, for administrators only: list of all users with role, qualification, session count, average accuracy and last sign-in. Actions: view a user's results, rename, block or unblock, grant or remove the administrator role, set the qualification level directly, delete the user with all their results.
+- **Who is an administrator:** the email addresses listed in the server settings always are, and cannot be demoted from the page. They can appoint others.
+- **Blocked** accounts can sign in but cannot join rooms or take tests.
 
 ## 9. Decisions
 
@@ -164,7 +174,7 @@ Still open (the proposed default applies unless you say otherwise):
 0. **Hosting check** — hello-world Node.js app on `morse.viljar.ee` to settle the unknowns in section 7.
 1. **Morse engine** — text to timing, tone playback in the browser, Koch/Farnsworth settings. Usable alone as a solo trainer.
 2. **Single-room session** — lobby, synchronized start, typing, server scoring, result page. Tested locally with several browser windows.
-3. **Sign-in and scoreboard** — Google sign-in, stored results, session and long-term tables.
-4. **First deployment** — database, deploy script, first real session with a few friends.
+3. **Sign-in and saved results** — Google sign-in, accounts, results saved per account, administration page. *(built; goes live once the Google client is set up)*
+4. **First deployment** — deploy script, first real session with a few friends. *(the version without sign-in is live at morse.viljar.ee)*
 5. **Levels, rounds and schedule** — multiple rooms, round types, fixed timetable, per-character statistics, level suggestions.
 6. **Polish** — both languages complete, progress charts, mobile layout.

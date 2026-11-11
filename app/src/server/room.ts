@@ -27,6 +27,8 @@ export interface RoomConfig {
 }
 
 interface Participant {
+  /** The account this participant belongs to. */
+  userId: string;
   name: string;
   token: string;
   answers: string[];
@@ -38,6 +40,8 @@ interface Participant {
 interface Session {
   startAt: number;
   solo: boolean;
+  /** Set once the results have been handed over for saving. */
+  saved: boolean;
   groups: string[];
   timeline: Timeline;
   participants: Map<string, Participant>;
@@ -85,6 +89,25 @@ export interface ReadyResult {
 }
 export type ResultView = { ready: false } | ReadyResult;
 
+/** One participant's outcome in a finished session, ready to be saved. */
+export interface SavedRow {
+  userId: string;
+  correct: number;
+  total: number;
+  accuracy: number;
+  rank: number;
+  /** Per character over the groups attended: [times sent, times correct]. */
+  chars: Record<string, [number, number]>;
+}
+
+export interface FinishedSession {
+  level: string;
+  solo: boolean;
+  startAt: number;
+  people: number;
+  rows: SavedRow[];
+}
+
 export interface RoomInfo {
   startAt: number;
   running: boolean;
@@ -127,7 +150,7 @@ export class Room {
   private build(startAt: number, solo: boolean, groups: string[]): Session {
     const timing = makeTiming(this.level.charWpm, this.level.effWpm);
     const timeline = buildTimeline(groups, timing, this.cfg.pauseMs);
-    return { startAt, solo, groups, timeline, participants: new Map() };
+    return { startAt, solo, saved: false, groups, timeline, participants: new Map() };
   }
 
   private createShared(startAt: number): Session {
@@ -144,9 +167,10 @@ export class Room {
     return session;
   }
 
-  private addParticipant(session: Session, name: string, attemptedFrom: number, now: number): string {
+  private addParticipant(session: Session, userId: string, name: string, attemptedFrom: number, now: number): string {
     const token = `${this.level.id}.${this.makeToken()}`;
     session.participants.set(token, {
+      userId,
       name,
       token,
       answers: new Array<string>(session.groups.length).fill(''),
@@ -182,10 +206,13 @@ export class Room {
     return { startAt: s.startAt, running: s.startAt <= now, people: s.participants.size };
   }
 
-  join(rawName: string, now: number): { token: string } | { error: string } {
-    const base = [...rawName.replace(/[\u0000-\u001f\u007f]/g, '').trim()].slice(0, MAX_NAME).join('');
+  /** Joins the active session. Joining again returns the same seat. */
+  join(user: { id: string; name: string }, now: number): { token: string } | { error: string } {
+    const base = [...user.name.replace(/[\u0000-\u001f\u007f]/g, '').trim()].slice(0, MAX_NAME).join('');
     if (!base) return { error: 'name-required' };
     const session = this.activeSession(now);
+    const seat = [...session.participants.values()].find((p) => p.userId === user.id);
+    if (seat) return { token: seat.token };
     if (session.participants.size >= MAX_PARTICIPANTS) return { error: 'room-full' };
 
     const taken = new Set([...session.participants.values()].map((p) => p.name.toLowerCase()));
@@ -198,15 +225,15 @@ export class Room {
       const next = session.timeline.groups.find((g) => g.startMs >= elapsed);
       attemptedFrom = next ? next.index : session.groups.length;
     }
-    return { token: this.addParticipant(session, name, attemptedFrom, now) };
+    return { token: this.addParticipant(session, user.id, name, attemptedFrom, now) };
   }
 
   /** Starts a private qualification test in which every character appears equally often. */
-  startSolo(now: number): { token: string } {
+  startSolo(userId: string, now: number): { token: string } {
     const groups = coverageGroups(makeRng(this.makeSeed()), levelChars(this.level), testRepeats(this.level));
     const session = this.build(now + this.cfg.soloLeadMs, true, groups);
     this.solos.add(session);
-    return { token: this.addParticipant(session, 'solo', 0, now) };
+    return { token: this.addParticipant(session, userId, 'solo', 0, now) };
   }
 
   private phase(s: Session, now: number): Phase {
@@ -261,37 +288,75 @@ export class Room {
     return { ok: true };
   }
 
+  /** Everyone's totals for a session, best first, with places assigned. */
+  private table(s: Session): { p: Participant; scores: GroupScore[]; correct: number; total: number; accuracy: number; rank: number }[] {
+    const rows = [...s.participants.values()].map((p) => {
+      const scores = s.groups.map((g, i) => scoreGroup(g, p.answers[i]));
+      const correct = scores.reduce((n, x) => n + x.correct, 0);
+      const total = scores.reduce((n, x) => n + x.total, 0);
+      const attempted = scores.slice(p.attemptedFrom).reduce((n, x) => n + x.total, 0);
+      return { p, scores, correct, total, accuracy: attempted ? correct / attempted : 0, rank: 0 };
+    });
+    rows.sort((a, b) => b.correct - a.correct || b.accuracy - a.accuracy || a.p.name.localeCompare(b.p.name));
+    rows.forEach((r, i) => {
+      const prev = rows[i - 1];
+      r.rank = prev && prev.correct === r.correct && prev.accuracy === r.accuracy ? prev.rank : i + 1;
+    });
+    return rows;
+  }
+
+  private isOver(s: Session, now: number): boolean {
+    // Wait out the grace period so everyone's last answer has arrived.
+    return now >= s.startAt + s.timeline.totalMs + this.cfg.graceMs;
+  }
+
   result(token: string, now: number): ResultView | null {
     const s = this.byToken.get(token);
     const me = s?.participants.get(token);
     if (!s || !me) return null;
     me.lastSeen = now;
-    // Wait out the grace period so everyone's last answer has arrived.
-    if (now < s.startAt + s.timeline.totalMs + this.cfg.graceMs) return { ready: false };
+    if (!this.isOver(s, now)) return { ready: false };
 
-    const score = (p: Participant) => s.groups.map((g, i) => scoreGroup(g, p.answers[i]));
-    const rows = [...s.participants.values()].map((p) => {
-      const scores = score(p);
-      const correct = scores.reduce((n, x) => n + x.correct, 0);
-      const total = scores.reduce((n, x) => n + x.total, 0);
-      const attempted = scores.slice(p.attemptedFrom).reduce((n, x) => n + x.total, 0);
-      return { name: p.name, correct, total, accuracy: attempted ? correct / attempted : 0, you: p === me, rank: 0 };
-    });
-    rows.sort((a, b) => b.correct - a.correct || b.accuracy - a.accuracy || a.name.localeCompare(b.name));
-    rows.forEach((r, i) => {
-      const prev = rows[i - 1];
-      r.rank = prev && prev.correct === r.correct && prev.accuracy === r.accuracy ? prev.rank : i + 1;
-    });
-
+    const rows = this.table(s);
+    const mine = rows.find((r) => r.p === me)!;
     return {
       ready: true,
       level: this.level.id,
       solo: s.solo,
-      scores: score(me),
+      scores: mine.scores,
       attemptedFrom: me.attemptedFrom,
-      accuracy: rows.find((r) => r.you)?.accuracy ?? 0,
-      board: rows,
+      accuracy: mine.accuracy,
+      board: rows.map((r) => ({
+        rank: r.rank, name: r.p.name, correct: r.correct, total: r.total, accuracy: r.accuracy, you: r.p === me,
+      })),
       nextStartAt: this.activeSession(now).startAt,
     };
+  }
+
+  /**
+   * Sessions that have ended since the last call, with each participant's
+   * outcome. Each session is returned exactly once, so the caller can save it.
+   */
+  collectFinished(now: number): FinishedSession[] {
+    const out: FinishedSession[] = [];
+    for (const s of [...this.shared.values(), ...this.solos]) {
+      if (s.saved || !this.isOver(s, now)) continue;
+      s.saved = true;
+      if (s.participants.size === 0) continue;
+      const rows = this.table(s).map((r) => {
+        const chars: Record<string, [number, number]> = {};
+        for (const score of r.scores.slice(r.p.attemptedFrom)) {
+          for (const op of score.ops) {
+            if (op.type === 'extra') continue;
+            const stat = (chars[op.sent] ??= [0, 0]);
+            stat[0]++;
+            if (op.type === 'ok') stat[1]++;
+          }
+        }
+        return { userId: r.p.userId, correct: r.correct, total: r.total, accuracy: r.accuracy, rank: r.rank, chars };
+      });
+      out.push({ level: this.level.id, solo: s.solo, startAt: s.startAt, people: s.participants.size, rows });
+    }
+    return out;
   }
 }

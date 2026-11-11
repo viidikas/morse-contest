@@ -1,6 +1,6 @@
 // Room logic tests. Run with: npm test
 import { Room, type RoomConfig } from '../server/room.js';
-import { Contest } from '../server/contest.js';
+import { Contest, mayEnter } from '../server/contest.js';
 import { LEVELS, PASS_ACCURACY, type LevelDef } from '../engine/levels.js';
 import { makeRng, coverageGroups } from '../engine/content.js';
 
@@ -23,6 +23,8 @@ const cfg: RoomConfig = {
 const LEVEL: LevelDef = { id: 'beginner', charCount: 4, charWpm: 20, effWpm: 20, requiresTest: false };
 let n = 0;
 const makeRoom = () => new Room(LEVEL, cfg, () => `tok${++n}`, () => 7);
+let uid = 0;
+const as = (name: string) => ({ id: `u${++uid}`, name });
 const tokenOf = (r: { token: string } | { error: string }): string => ('token' in r ? r.token : '');
 
 // --- scheduling and joining
@@ -30,11 +32,11 @@ const room = makeRoom();
 const T = 120_000 * 8_400_000; // a moment that is an exact multiple of the interval
 check('test clock is on a slot', T % cfg.intervalMs === 0);
 const now = T + 10_000;
-const a = tokenOf(room.join('  Viljar ', now));
-const b = tokenOf(room.join('Mari', now + 500));
-const dup = tokenOf(room.join('viljar', now + 600));
+const a = tokenOf(room.join(as('  Viljar '), now));
+const b = tokenOf(room.join(as('Mari'), now + 500));
+const dup = tokenOf(room.join(as('viljar'), now + 600));
 check('join returns tokens', !!a && !!b && a !== b);
-check('empty name is refused', 'error' in room.join('   ', now));
+check('empty name is refused', 'error' in room.join(as('   '), now));
 check('unknown token gets no state', room.state('nope', now, 0) === null);
 
 const st = room.state(a, now + 1000, 0)!;
@@ -49,10 +51,10 @@ check('characters for the level', st.chars === 'KMUR');
 
 // A join too close to a slot goes to the following one.
 const late = makeRoom();
-const lt = tokenOf(late.join('X', T + 110_000));
+const lt = tokenOf(late.join(as('X'), T + 110_000));
 check('too close to the slot: next one', late.state(lt, T + 110_000, 0)!.startAt === T + 240_000);
 // ...but an existing lobby is joined even in its last seconds.
-const lt2 = tokenOf(room.join('Last', T + 119_000));
+const lt2 = tokenOf(room.join(as('Last'), T + 119_000));
 check('existing lobby is joined late', room.state(lt2, T + 119_000, 0)!.startAt === T + 120_000);
 
 // --- release of text
@@ -78,7 +80,7 @@ check('unknown token is refused', room.answer('nope', 0, 'K', start + 100).reaso
 g.forEach((slot) => room.answer(b, slot.index, slot.text, start + slot.deadlineMs));
 
 // A participant who joins mid-session.
-const mid = tokenOf(room.join('Late', start + g[2].startMs + 10));
+const mid = tokenOf(room.join(as('Late'), start + g[2].startMs + 10));
 check('mid-session join enters the running session', room.state(mid, start + g[2].startMs + 20, 0)!.startAt === start);
 check('late joiner cannot answer the group in progress', room.answer(mid, 2, g[2].text, start + g[2].startMs + 50).reason === 'not-joined-yet');
 room.answer(mid, 3, g[3].text, start + g[3].deadlineMs);
@@ -106,7 +108,7 @@ const lateRes = room.result(mid, end + 2500)!;
 check('late joiner attemptedFrom', lateRes.ready && lateRes.attemptedFrom === 3);
 
 // After the session, a new join goes to the next slot.
-const next = tokenOf(room.join('Again', end + 3000));
+const next = tokenOf(room.join(as('Again'), end + 3000));
 check('new join after the end gets the next session', room.state(next, end + 3000, 0)!.startAt === T + 240_000);
 
 // --- housekeeping
@@ -121,19 +123,27 @@ const padded = coverageGroups(makeRng(3), 'KMU', 3).join('');
 check('coverage: padded to whole groups', padded.length === 10 && [...'KMU'].every((ch) => padded.split(ch).length - 1 >= 3));
 
 // --- levels and qualification
-const contest = new Contest(cfg, () => `c${++n}`, () => 11, (data) => `sig(${data})`);
+const contest = new Contest(cfg, () => `c${++n}`, () => 11);
 const t0 = T + 5000;
-const info = contest.levels(t0);
+const ann = { id: 'ann', name: 'Ann', level: null as string | null };
+const info = contest.levels(t0, null);
 check('three levels listed', info.levels.length === 3 && info.levels[0].id === 'beginner');
 check('levels share the start time', info.levels.every((l) => l.startAt === info.levels[0].startAt));
-check('beginner is open to everyone', 'token' in contest.join('beginner', 'Ann', '', t0));
-check('mid is locked without a pass', (contest.join('mid', 'Ann', '', t0) as { error: string }).error === 'not-qualified');
-check('unknown level is refused', (contest.join('nope', 'Ann', '', t0) as { error: string }).error === 'unknown-level');
-check('no test for beginner', 'error' in contest.qualify('beginner', t0));
+check('only beginner open without qualification', info.levels.map((l) => l.open).join() === 'true,false,false');
+check('mid qualification opens mid, not advanced', contest.levels(t0, 'mid').levels.map((l) => l.open).join() === 'true,true,false');
+check('advanced qualification opens everything', contest.levels(t0, 'advanced').levels.every((l) => l.open));
+check('mayEnter agrees', mayEnter(null, 'beginner') && !mayEnter(null, 'mid') && mayEnter('advanced', 'mid') && !mayEnter('mid', 'nope'));
+const annSeat = contest.join('beginner', ann, t0);
+check('beginner is open to everyone', 'token' in annSeat);
+check('joining twice gives the same seat', tokenOf(contest.join('beginner', ann, t0 + 100)) === tokenOf(annSeat));
+check('still one participant', contest.state(tokenOf(annSeat), t0 + 200, 0)!.participants.length === 1);
+check('mid is locked without qualification', (contest.join('mid', ann, t0) as { error: string }).error === 'not-qualified');
+check('unknown level is refused', (contest.join('nope', ann, t0) as { error: string }).error === 'unknown-level');
+check('no test for beginner', 'error' in contest.qualify('beginner', ann, t0));
 
 const midLevel = LEVELS.find((l) => l.id === 'mid')!;
-function runTest(copyShare: number): { passed?: boolean; pass?: string } {
-  const tok = tokenOf(contest.qualify('mid', t0));
+function runTest(player: { id: string; name: string; level: string | null }, copyShare: number): { passed?: boolean } {
+  const tok = tokenOf(contest.qualify('mid', player, t0));
   const first = contest.state(tok, t0, 0)!;
   const endAt = first.startAt + first.totalMs;
   const every = contest.state(tok, endAt - 1, 0)!.groups;
@@ -145,24 +155,29 @@ function runTest(copyShare: number): { passed?: boolean; pass?: string } {
   check('test covers every character five times',
     [...first.chars].every((ch) => every.map((x) => x.text).join('').split(ch).length - 1 === 5));
   check('test uses the level characters', first.chars.length === midLevel.charCount);
-  return contest.result(tok, endAt + cfg.graceMs) as { passed?: boolean; pass?: string };
+  return contest.result(tok, endAt + cfg.graceMs) as { passed?: boolean };
 }
-const fail = runTest(PASS_ACCURACY - 0.1);
-check('below the threshold fails', fail.passed === false && fail.pass === undefined);
-const ok = runTest(PASS_ACCURACY + 0.05);
-check('above the threshold passes', ok.passed === true && typeof ok.pass === 'string');
-const pass = ok.pass ?? '';
-const opened = contest.join('mid', 'Ann', pass, t0);
-check('pass opens mid', 'token' in opened, JSON.stringify(opened) + ' pass=' + pass);
-check('mid pass does not open advanced', 'error' in contest.join('advanced', 'Ann', pass, t0));
-check('advanced pass opens mid', contest.passAllows(contest.makePass('advanced', t0), 'mid', t0));
-check('tampered pass is refused', 'error' in contest.join('mid', 'Ann', pass.replace('mid', 'advanced'), t0));
-check('forged signature is refused', 'error' in contest.join('mid', 'Ann', pass.slice(0, -2) + 'xx', t0));
-check('expired pass is refused', !contest.passAllows(pass, 'mid', t0 + 181 * 24 * 3600 * 1000));
-check('garbage pass is refused', !contest.passAllows('hello', 'mid', t0) && !contest.passAllows('', 'mid', t0));
-const midTok = tokenOf(contest.join('mid', 'Bob', pass, t0));
+check('below the threshold fails', runTest({ id: 'bob', name: 'Bob', level: null }, PASS_ACCURACY - 0.1).passed === false);
+check('above the threshold passes', runTest({ id: 'cat', name: 'Cat', level: null }, PASS_ACCURACY + 0.05).passed === true);
+check('qualified account may join mid', 'token' in contest.join('mid', { ...ann, level: 'mid' }, t0));
+check('mid qualification does not open advanced', 'error' in contest.join('advanced', { ...ann, level: 'mid' }, t0));
+const midTok = tokenOf(contest.join('mid', { id: 'dan', name: 'Dan', level: 'advanced' }, t0));
 check('state is routed to the right room', contest.state(midTok, t0, 0)!.level === 'mid');
 check('shared session is not solo', contest.state(midTok, t0, 0)!.solo === false);
+
+// --- handing finished sessions over for saving
+const later = t0 + 10 * 60_000;
+const finished = contest.collectFinished(later);
+const tests = finished.filter((f) => f.solo);
+check('both tests are reported', tests.length === 2);
+check('test verdicts are reported', tests.map((f) => f.passed).sort().join() === 'false,true');
+check('a passed test names its account', tests.find((f) => f.passed)!.rows[0].userId === 'cat');
+const beginnerDone = finished.find((f) => !f.solo && f.level === 'beginner')!;
+check('contest session is reported with its people', beginnerDone.people === 1 && beginnerDone.rows[0].userId === 'ann');
+check('contest session has no verdict', beginnerDone.passed === null);
+check('per-character counts cover the whole session',
+  Object.values(beginnerDone.rows[0].chars).reduce((sum, c) => sum + c[0], 0) === beginnerDone.rows[0].total);
+check('each session is reported only once', contest.collectFinished(later + 1000).length === 0);
 
 console.log(`${passed} passed, ${failed} failed`);
 if (failed) process.exitCode = 1;
