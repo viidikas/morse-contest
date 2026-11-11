@@ -113,7 +113,8 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
 
 async function staticFile(res: http.ServerResponse, pathname: string): Promise<void> {
   let path = decodeURIComponent(pathname);
-  if (path === '/') {
+  // The web server in front may ask for /index.html when the visitor asked for /.
+  if (path === '/' || path === '/index.html') {
     res.writeHead(302, { Location: '/web/contest.html' });
     res.end();
     return;
