@@ -2,6 +2,7 @@
 import { MORSE, KOCH_ORDER, kochChars, makeTiming, buildTimeline, charDurationMs } from '../engine/morse.js';
 import { makeRng, randomGroups } from '../engine/content.js';
 import { scoreGroup, summarize } from '../engine/score.js';
+import { analyzePractice } from '../engine/practice.js';
 
 declare const process: { exitCode?: number };
 
@@ -90,6 +91,23 @@ check('summary totals', sum.correct === 4 && sum.total === 6);
 check('summary accuracy', near(sum.accuracy, 4 / 6));
 check('worst character first', sum.chars[0].char === 'B' && sum.chars[0].sent === 3 && sum.chars[0].correct === 1);
 check('top confusion', sum.confusions[0].sent === 'B' && sum.confusions[0].typed === 'D' && sum.confusions[0].count === 2);
+
+// --- continuous practice analysis
+const pa = analyzePractice([
+  { score: scoreGroup('KRM', 'KRM'), repeats: 0, answerMs: 1000 },
+  { score: scoreGroup('KRU', 'KKU'), repeats: 2, answerMs: 5000 },
+  { score: scoreGroup('MUE', 'MUE'), repeats: 1, answerMs: 3000 },
+  { score: scoreGroup('RKE', 'KKE'), repeats: 0, answerMs: 1000 },
+]);
+check('practice group count', pa.groups === 4);
+check('practice average repeats', near(pa.avgRepeats, 0.75));
+check('practice average answer time', near(pa.avgAnswerMs, 2500));
+check('miscopied character is weakest', pa.weak[0].char === 'R' && pa.weak[0].correct === 1 && pa.weak[0].sent === 3);
+check('weak character lists its mix-up', pa.weak[0].mixedWith[0].typed === 'K' && pa.weak[0].mixedWith[0].count === 2);
+check('often repeated character is weak', pa.weak.some((w) => w.char === 'U' && w.repeated === 2));
+check('well copied character is not weak', !pa.weak.some((w) => w.char === 'K'));
+check('hardest groups: most repeats first, none without', pa.hardest.length === 2 && pa.hardest[0].score.sent === 'KRU');
+check('empty practice', analyzePractice([]).groups === 0 && analyzePractice([]).weak.length === 0);
 
 console.log(`${passed} passed, ${failed} failed`);
 if (failed) process.exitCode = 1;

@@ -19,6 +19,12 @@
   <p><button type="button" class="link" id="chart-toggle" aria-controls="chart"></button></p>
 
   <section id="view-setup" class="panel">
+    <div class="seg" role="group">
+      <button type="button" data-practice="rounds" data-t="modeRounds"></button>
+      <button type="button" data-practice="continuous" data-t="modeContinuous"></button>
+    </div>
+    <p class="muted mode-note rounds-only" data-t="modeRoundsNote"></p>
+    <p class="muted mode-note continuous-only" data-t="modeContinuousNote"></p>
     <div class="field">
       <label for="level" data-t="level"></label><output id="level-value"></output>
       <input id="level" type="range" min="2" max="41" step="1">
@@ -32,13 +38,21 @@
       <label for="effWpm" data-t="effSpeed"></label><output id="effWpm-value"></output>
       <input id="effWpm" type="range" min="4" max="40" step="1">
     </div>
-    <div class="field">
+    <div class="field rounds-only">
       <label for="pauseS" data-t="pause"></label><output id="pauseS-value"></output>
       <input id="pauseS" type="range" min="1" max="8" step="0.5">
     </div>
-    <div class="field">
+    <div class="field rounds-only">
       <label for="groups" data-t="groups"></label><output id="groups-value"></output>
       <input id="groups" type="range" min="5" max="60" step="5">
+    </div>
+    <div class="field continuous-only">
+      <label for="groupLen" data-t="groupLen"></label><output id="groupLen-value"></output>
+      <input id="groupLen" type="range" min="1" max="7" step="1">
+    </div>
+    <div class="field continuous-only">
+      <label for="repeatS" data-t="repeatAfter"></label><output id="repeatS-value"></output>
+      <input id="repeatS" type="range" min="0.5" max="10" step="0.5">
     </div>
     <div class="field">
       <label for="pitch" data-t="pitch"></label><output id="pitch-value"></output>
@@ -51,15 +65,25 @@
     <div class="actions">
       <button type="button" class="primary" id="start" data-t="start"></button>
       <button type="button" class="secondary" id="test-tone" data-t="testTone"></button>
-      <span class="note"><span data-t="duration"></span>: <span id="duration"></span></span>
+      <span class="note rounds-only"><span data-t="duration"></span>: <span id="duration"></span></span>
     </div>
   </section>
 
-  <section id="view-run" class="panel" hidden>
-    <input id="answer" class="mono" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="12">
-    <progress id="progress" value="0" max="1"></progress>
-    <div class="runline"><span id="status"></span><span id="time-left"></span></div>
-    <div class="actions"><button type="button" class="secondary" id="stop" data-t="stop"></button></div>
+  <section id="view-run" hidden>
+    <div class="panel">
+      <input id="answer" class="mono" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="12">
+      <progress id="progress" class="rounds-only" value="0" max="1"></progress>
+      <div class="runline"><span id="status"></span><span id="time-left"></span></div>
+      <p class="legend continuous-only" data-t="continuousKeys"></p>
+      <div class="actions"><button type="button" class="secondary" id="stop" data-t="stop"></button></div>
+    </div>
+    <div class="continuous-only">
+      <h2 data-t="liveTitle"></h2>
+      <table class="live">
+        <thead><tr><th data-t="sent"></th><th data-t="typed"></th><th class="num" data-t="repeatsCol"></th></tr></thead>
+        <tbody id="live"></tbody>
+      </table>
+    </div>
   </section>
 
   <section id="view-result" hidden>
@@ -70,6 +94,15 @@
       <div id="stopped-note" class="muted" hidden></div>
       <div id="level-up" class="levelup" data-t="levelUp" hidden></div>
       <div class="actions"><button type="button" class="primary" id="again" data-t="again"></button></div>
+    </div>
+
+    <div id="analysis" hidden>
+      <h2 data-t="analysis"></h2>
+      <div id="analysis-stats" class="stats"></div>
+      <h2 data-t="practiseMore"></h2>
+      <ul id="weak-chars" class="weak-list"></ul>
+      <h2 data-t="mostRepeats"></h2>
+      <ul id="hardest" class="inline-list mono"></ul>
     </div>
 
     <h2 data-t="confusions"></h2>

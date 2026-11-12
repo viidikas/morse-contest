@@ -22,6 +22,18 @@ export function formatDuration(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+/** What was typed, coloured: right, wrong, missed (_) and extra (crossed out). */
+export function typedCell(tag: string, s: GroupScore): HTMLElement {
+  const typed = el(tag, 'mono', '');
+  for (const op of s.ops) {
+    if (op.type === 'ok') typed.append(el('span', 'ok', op.typed));
+    else if (op.type === 'sub') typed.append(el('span', 'bad', op.typed));
+    else if (op.type === 'miss') typed.append(el('span', 'bad', '_'));
+    else typed.append(el('span', 'extra', op.typed));
+  }
+  return typed;
+}
+
 /**
  * Fills in accuracy, mix-ups, the per-character table and the group list.
  * Groups before `attemptedFrom` (missed by joining late) are shown dimmed and
@@ -38,14 +50,7 @@ export function renderResult(scores: GroupScore[], lang: Lang, attemptedFrom: nu
     const row = document.createElement('tr');
     if (i < attemptedFrom) row.className = 'skipped';
     row.append(el('td', 'num', String(i + 1)), el('td', 'mono', s.sent));
-    const typed = el('td', 'mono', '');
-    for (const op of s.ops) {
-      if (op.type === 'ok') typed.append(el('span', 'ok', op.typed));
-      else if (op.type === 'sub') typed.append(el('span', 'bad', op.typed));
-      else if (op.type === 'miss') typed.append(el('span', 'bad', '_'));
-      else typed.append(el('span', 'extra', op.typed));
-    }
-    row.append(typed, el('td', 'num', `${s.correct}/${s.total}`));
+    row.append(typedCell('td', s), el('td', 'num', `${s.correct}/${s.total}`));
     groups.append(row);
   });
 
