@@ -123,6 +123,10 @@ function initForm(): void {
 
 let timer: number | undefined;
 let lastScores: GroupScore[] | null = null;
+/** Groups in the round of the last result; more than its scores when Stop was pressed. */
+let lastTotal = 0;
+/** Ends the running round early; set while a round is running. */
+let stopHandler: (() => void) | null = null;
 
 async function testTone(): Promise<void> {
   await player.ready();
@@ -166,22 +170,49 @@ async function start(): Promise<void> {
     }
     if (nowMs >= timeline.totalMs) {
       if (current >= 0) answers[current] = answer.value;
-      finish(timeline, answers);
+      finish(timeline, answers, timeline.groups.length);
     }
+  };
+  stopHandler = (): void => {
+    // Stopped before the first group: nothing to score.
+    if (current < 0) {
+      endRound();
+      show('setup');
+      return;
+    }
+    // Score the groups already sent. The one in progress counts only if
+    // something was typed for it.
+    answers[current] = answer.value;
+    const done = answer.value.trim() ? current + 1 : current;
+    if (done === 0) {
+      endRound();
+      show('setup');
+      return;
+    }
+    finish(timeline, answers, done);
   };
   timer = window.setInterval(tick, 25);
 }
 
-function stopRound(): void {
+function endRound(): void {
   window.clearInterval(timer);
   player.stop();
-  show('setup');
+  stopHandler = null;
 }
 
-function finish(timeline: Timeline, answers: string[]): void {
-  window.clearInterval(timer);
-  player.stop();
-  lastScores = timeline.groups.map((g, i) => scoreGroup(g.text, answers[i]));
+function stopRound(): void {
+  if (stopHandler) stopHandler();
+  else {
+    endRound();
+    show('setup');
+  }
+}
+
+/** Shows the result for the first `count` groups of the round. */
+function finish(timeline: Timeline, answers: string[], count: number): void {
+  endRound();
+  lastTotal = timeline.groups.length;
+  lastScores = timeline.groups.slice(0, count).map((g, i) => scoreGroup(g.text, answers[i]));
   showResult(lastScores);
   show('result');
   $<HTMLButtonElement>('again').focus();
@@ -191,7 +222,14 @@ function finish(timeline: Timeline, answers: string[]): void {
 
 function showResult(scores: GroupScore[]): void {
   const sum = renderResult(scores, settings.lang);
-  $('level-up').hidden = !(sum.accuracy >= 0.9 && settings.level < KOCH_ORDER.length);
+  const partial = scores.length < lastTotal;
+  const note = $('stopped-note');
+  note.hidden = !partial;
+  note.textContent = partial
+    ? t('stoppedEarly', settings.lang).replace('{n}', String(scores.length)).replace('{total}', String(lastTotal))
+    : '';
+  // A level-up is only suggested after a full round.
+  $('level-up').hidden = partial || !(sum.accuracy >= 0.9 && settings.level < KOCH_ORDER.length);
 }
 
 // ---------- wiring

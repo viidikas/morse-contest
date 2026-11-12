@@ -47,6 +47,10 @@ const TEXT = {
   },
   toContest: { en: 'Go to the contest', et: 'Mine võistlusele' },
   toTrainer: { en: 'Practise alone', et: 'Harjuta üksi' },
+  stoppedEarly: {
+    en: 'Stopped early: result for {n} of {total} groups.',
+    et: 'Katkestatud: tulemus {n} grupi põhjal {total}-st.',
+  },
   toHome: { en: 'Start page', et: 'Avaleht' },
   homeTitle: { en: 'Morse trainer', et: 'Morse treener' },
   homeIntro: {
