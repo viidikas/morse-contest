@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Morse trainer</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1 data-t="homeTitle">Morse trainer</h1>
+    <div class="lang">
+      <button type="button" data-lang="et" aria-pressed="false">ET</button>
+      <button type="button" data-lang="en" aria-pressed="true">EN</button>
+    </div>
+  </header>
+  <nav id="userbar" class="userbar"></nav>
+  <p class="lead" data-t="homeIntro"></p>
+
+  <div class="choices">
+    <section class="panel choice">
+      <h2 id="login-heading" data-t="homeLoginTitle"></h2>
+      <p class="muted" id="login-note" data-t="homeLoginNote"></p>
+      <a class="button primary" id="login-link" href="contest.html" data-t="signIn"></a>
+    </section>
+    <section class="panel choice">
+      <h2 data-t="homePractiseTitle"></h2>
+      <p class="muted" data-t="homePractiseNote"></p>
+      <a class="button secondary" href="index.html" data-t="homePractise"></a>
+    </section>
+  </div>
+</main>
+<script type="module" src="../dist/web/home.js"></script>
+</body>
+</html>

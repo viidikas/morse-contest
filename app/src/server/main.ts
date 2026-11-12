@@ -326,7 +326,7 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
 async function staticFile(res: http.ServerResponse, pathname: string): Promise<void> {
   let path = decodeURIComponent(pathname);
   // The web server in front may ask for /index.html when the visitor asked for /.
-  if (path === '/' || path === '/index.html') return redirect(res, '/web/contest.html');
+  if (path === '/' || path === '/index.html') return redirect(res, '/web/home.html');
   if (path.endsWith('/')) path += 'index.html';
   const file = normalize(join(appRoot, path));
   const allowed = PUBLIC_PREFIXES.some((p) => path.startsWith(p)) && file.startsWith(appRoot + sep);

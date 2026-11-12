@@ -47,6 +47,27 @@ const TEXT = {
   },
   toContest: { en: 'Go to the contest', et: 'Mine võistlusele' },
   toTrainer: { en: 'Practise alone', et: 'Harjuta üksi' },
+  toHome: { en: 'Start page', et: 'Avaleht' },
+  homeTitle: { en: 'Morse trainer', et: 'Morse treener' },
+  homeIntro: {
+    en: 'Sign in to take part in contests and keep your results, or start practising right away without an account.',
+    et: 'Logi sisse, et osaleda võistlustel ja tulemusi säilitada, või alusta harjutamist kohe ilma kontota.',
+  },
+  homeLoginTitle: { en: 'Contest', et: 'Võistlus' },
+  homeLoginNote: {
+    en: 'Join rooms with other people. Your results are saved to your account.',
+    et: 'Liitu ruumidega koos teistega. Sinu tulemused salvestatakse sinu kontole.',
+  },
+  homeContestNote: {
+    en: 'You are signed in. Pick a room and join the next session.',
+    et: 'Oled sisse logitud. Vali ruum ja liitu järgmise sessiooniga.',
+  },
+  homePractiseTitle: { en: 'Practice', et: 'Harjutamine' },
+  homePractiseNote: {
+    en: 'Train on your own at your own pace. No sign-in needed; settings stay in this browser.',
+    et: 'Harjuta omaette ja oma tempos. Sisselogimist pole vaja; seaded jäävad sellesse brauserisse.',
+  },
+  homePractise: { en: 'Practise', et: 'Harjuta' },
   contestTitle: { en: 'Morse contest', et: 'Morse võistlus' },
   contestIntro: {
     en: 'Everyone hears the same Morse at the same moment. Type what you hear; the scoreboard comes at the end.',

@@ -95,6 +95,13 @@ button.link { background: none; border: none; padding: 0; font: inherit; font-si
 /* Accounts */
 .userbar { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; font-size: 0.9rem; margin: 0 0 14px; }
 .userbar:empty { display: none; }
+a.button.secondary { background: var(--panel); color: var(--text); border: 1px solid var(--line); }
+
+/* Start page */
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.choice { display: flex; flex-direction: column; align-items: flex-start; }
+.choice h2 { margin: 0 0 6px; }
+.choice p { margin: 0 0 16px; flex: 1; }
 .userbar .who { font-weight: 700; }
 .userbar a { color: var(--muted); }
 .userbar a.current { color: var(--text); text-decoration: none; }

@@ -85,7 +85,7 @@ export const fill = (text: string, values: Record<string, string | number>): str
   text.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ''));
 
 /** The line at the top: who is signed in, and links to the other pages. */
-export function renderUserBar(me: Me, lang: Lang, current: 'contest' | 'account' | 'admin'): void {
+export function renderUserBar(me: Me, lang: Lang, current: 'home' | 'contest' | 'account' | 'admin'): void {
   const bar = document.getElementById('userbar');
   if (!bar) return;
   bar.replaceChildren();
@@ -100,7 +100,7 @@ export function renderUserBar(me: Me, lang: Lang, current: 'contest' | 'account'
   const out = el('button', 'link', t('signOut', lang)) as HTMLButtonElement;
   out.type = 'button';
   out.addEventListener('click', () => {
-    void json('POST', 'auth/logout').then(() => location.assign('contest.html'));
+    void json('POST', 'auth/logout').then(() => location.assign('home.html'));
   });
   bar.append(out);
 }
