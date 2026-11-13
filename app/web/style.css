@@ -1,23 +1,35 @@
+/* Light by default; dark from the system setting unless the visitor chose
+   light, or whenever they chose dark (theme.js sets data-theme on <html>). */
 :root {
   --bg: #f6f5f1; --panel: #ffffff; --text: #1c1b19; --muted: #6b6860; --line: #dedbd3;
   --accent: #b4541a; --accent-text: #ffffff; --ok: #1f7a3d; --bad: #b3261e;
+  color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #161513; --panel: #201f1c; --text: #ece9e2; --muted: #a09c92; --line: #37352f;
     --accent: #e08a4f; --accent-text: #1c1b19; --ok: #6fcf8e; --bad: #f2877f;
+    color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+  --bg: #161513; --panel: #201f1c; --text: #ece9e2; --muted: #a09c92; --line: #37352f;
+  --accent: #e08a4f; --accent-text: #1c1b19; --ok: #6fcf8e; --bad: #f2877f;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, "Segoe UI", sans-serif; }
 main { max-width: 720px; margin: 0 auto; padding: 24px 16px 64px; }
-header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
 h1 { font-size: 1.6rem; margin: 0; letter-spacing: 0.02em; }
 h2 { font-size: 1.05rem; margin: 28px 0 10px; }
 p.lead { color: var(--muted); margin: 0 0 20px; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
 .lang button { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 6px; padding: 2px 9px; cursor: pointer; font: inherit; font-size: 0.85rem; }
 .lang button[aria-pressed="true"] { color: var(--text); border-color: var(--text); }
+.lang { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+.lang .theme-toggle { display: inline-flex; align-items: center; justify-content: center; padding: 3px 7px; margin-right: 8px; }
+.lang .theme-toggle:hover { color: var(--text); border-color: var(--text); }
 .field { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; margin-bottom: 14px; }
 .field label { font-size: 0.95rem; }
 .field output { font-variant-numeric: tabular-nums; color: var(--muted); }
