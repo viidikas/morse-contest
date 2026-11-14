@@ -67,6 +67,8 @@ export function initChart(): Chart {
     apply();
   });
   apply();
+  // Animate only later changes, not the state the page opens with.
+  requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.add('chart-anim')));
 
   return {
     setActive(chars) {

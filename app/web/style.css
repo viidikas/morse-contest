@@ -99,9 +99,23 @@ button.link { background: none; border: none; padding: 0; font: inherit; font-si
 .chart-code .dit { width: 6px; }
 .chart-code .dah { width: 16px; }
 @media (min-width: 1040px) {
-  #chart { position: fixed; top: 16px; right: 16px; bottom: 16px; width: 256px; margin: 0; overflow-y: auto; }
+  /* The table slides in over the right margin. On the desktop it stays in the
+     layout while closed (moved off screen and invisible) so it can slide. */
+  #chart, #chart[hidden] {
+    display: block; position: fixed; top: 16px; right: 16px; bottom: 16px; width: 256px; margin: 0; overflow-y: auto;
+  }
+  #chart[hidden] { transform: translateX(calc(100% + 24px)); visibility: hidden; }
   .chart-grid { grid-template-columns: 1fr 1fr; }
-  body.chart-open { padding-right: 288px; }
+  /* The page column (720px) stays centred as long as the table fits beside it,
+     which takes 720 + 2 × 288 = 1296px, plus 16px because 100vw includes the
+     scrollbar. On narrower screens the column moves left only as far as needed. */
+  body.chart-open { padding-right: max(0px, 1312px - 100vw); }
+  body.chart-anim { transition: padding-right 0.25s ease; }
+  body.chart-anim #chart { transition: transform 0.25s ease, visibility 0s; }
+  body.chart-anim #chart[hidden] { transition: transform 0.25s ease, visibility 0s linear 0.25s; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.chart-anim, body.chart-anim #chart, body.chart-anim #chart[hidden] { transition: none; }
 }
 
 /* Accounts */
