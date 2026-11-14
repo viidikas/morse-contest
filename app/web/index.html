@@ -24,8 +24,10 @@
       <button type="button" data-practice="rounds" data-t="modeRounds"></button>
       <button type="button" data-practice="continuous" data-t="modeContinuous"></button>
     </div>
-    <p class="muted mode-note rounds-only" data-t="modeRoundsNote"></p>
-    <p class="muted mode-note continuous-only" data-t="modeContinuousNote"></p>
+    <div class="mode-notes">
+      <p class="muted" data-note="rounds" data-t="modeRoundsNote"></p>
+      <p class="muted" data-note="continuous" data-t="modeContinuousNote"></p>
+    </div>
     <div class="field">
       <label for="level" data-t="level"></label><output id="level-value"></output>
       <input id="level" type="range" min="2" max="41" step="1">

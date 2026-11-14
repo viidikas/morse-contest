@@ -130,7 +130,12 @@ body[data-practice="continuous"] .rounds-only { display: none; }
 .seg button { font: inherit; border: none; background: none; color: var(--muted); padding: 7px 16px; cursor: pointer; }
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); font-weight: 600; }
-.mode-note { margin: 0 0 16px; font-size: 0.9rem; }
+/* Both mode explanations share one cell, so the space is as tall as the longer
+   one and the settings below do not move when the mode changes. */
+.mode-notes { display: grid; margin: 0 0 16px; font-size: 0.9rem; }
+.mode-notes p { grid-area: 1 / 1; margin: 0; }
+body[data-practice="rounds"] .mode-notes [data-note="continuous"],
+body[data-practice="continuous"] .mode-notes [data-note="rounds"] { visibility: hidden; }
 table.live td { font-size: 1.15rem; }
 table.live tbody tr:first-child td { font-weight: 700; }
 table.live tbody tr:nth-child(n+8) { opacity: 0.6; }
