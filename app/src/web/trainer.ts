@@ -40,7 +40,7 @@ const LEAD_IN_S = 1.5;
 /** Continuous mode: pause between a typed group and the next one. */
 const NEXT_GROUP_S = 0.7;
 /** Continuous mode: rows kept in the live list. */
-const LIVE_ROWS = 30;
+const LIVE_ROWS = 100;
 
 function loadSettings(): Settings {
   try {
@@ -64,6 +64,8 @@ const fill = (key: Key, values: Record<string, string | number>): string =>
 const views = { setup: $('view-setup'), run: $('view-run'), result: $('view-result') };
 function show(view: keyof typeof views): void {
   for (const [name, node] of Object.entries(views)) node.hidden = name !== view;
+  // While running, the page header is compacted (see style.css).
+  document.body.classList.toggle('running', view === 'run');
 }
 
 // ---------- language and mode
@@ -272,7 +274,11 @@ async function startContinuous(): Promise<void> {
   const repeatS = settings.repeatS;
   const answer = prepareRun();
   const live = $('live');
+  const liveWrap = $('live-wrap');
+  const liveWeak = $('live-weak');
   live.replaceChildren();
+  liveWrap.hidden = true;
+  liveWeak.hidden = true;
   const attempts: Attempt[] = [];
   const startedAt = player.now();
 
@@ -305,6 +311,14 @@ async function startContinuous(): Promise<void> {
     $('status').textContent = attempts.length
       ? fill('continuousStatus', { n: attempts.length, a: Math.round((score / total) * 100) })
       : t('getReady', settings.lang);
+    // The characters to watch so far, once there is enough to go on.
+    const weak = attempts.length >= 5 ? analyzePractice(attempts).weak.slice(0, 5) : [];
+    liveWeak.hidden = weak.length === 0;
+    liveWeak.replaceChildren();
+    if (weak.length) {
+      liveWeak.append(document.createTextNode(`${t('liveWeak', settings.lang)} `));
+      for (const w of weak) liveWeak.append(el('span', 'mono', w.char));
+    }
   };
 
   answerHandler = (submit: boolean): void => {
@@ -317,8 +331,10 @@ async function startContinuous(): Promise<void> {
 
     const row = document.createElement('tr');
     row.append(el('td', 'mono', score.sent), typedCell('td', score), el('td', 'num', repeats ? `↻ ${repeats}` : ''));
-    live.prepend(row);
-    while (live.children.length > LIVE_ROWS) live.lastElementChild?.remove();
+    live.append(row);
+    while (live.children.length > LIVE_ROWS) live.firstElementChild?.remove();
+    liveWrap.hidden = false;
+    liveWrap.scrollTop = liveWrap.scrollHeight; // keep the newest in view
     updateStatus();
     nextGroup(NEXT_GROUP_S);
   };

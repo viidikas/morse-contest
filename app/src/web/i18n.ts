@@ -64,7 +64,7 @@ const TEXT = {
     en: 'Enter sends what you have typed so far (missing letters count as missed). Esc stops.',
     et: 'Enter saadab seni trükitu (puuduvad tähed loetakse vahelejäänuks). Esc lõpetab.',
   },
-  liveTitle: { en: 'Your answers', et: 'Sinu vastused' },
+  liveWeak: { en: 'Watch out for:', et: 'Pane tähele:' },
   repeatsCol: { en: 'Repeats', et: 'Kordusi' },
   continuousStatus: { en: '{n} groups · {a}% correct', et: '{n} gruppi · {a}% õigeid' },
   analysis: { en: 'Analysis', et: 'Analüüs' },

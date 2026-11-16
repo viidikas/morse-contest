@@ -17,7 +17,7 @@
     </div>
   </header>
   <p class="lead" data-t="intro"></p>
-  <p><button type="button" class="link" id="chart-toggle" aria-controls="chart"></button></p>
+  <p class="chart-toggle-row"><button type="button" class="link" id="chart-toggle" aria-controls="chart"></button></p>
 
   <section id="view-setup" class="panel">
     <div class="seg" role="group">
@@ -73,19 +73,21 @@
   </section>
 
   <section id="view-run" hidden>
+    <!-- Continuous mode: answers so far, newest at the bottom just above the
+         answer box, so they stay in view when a phone keyboard is open. -->
+    <div id="live-wrap" class="live-wrap continuous-only" hidden>
+      <table class="live" aria-live="polite">
+        <thead><tr><th data-t="sent"></th><th data-t="typed"></th><th class="num" data-t="repeatsCol"></th></tr></thead>
+        <tbody id="live"></tbody>
+      </table>
+    </div>
     <div class="panel">
       <input id="answer" class="mono" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="12">
       <progress id="progress" class="rounds-only" value="0" max="1"></progress>
       <div class="runline"><span id="status"></span><span id="time-left"></span></div>
-      <p class="legend continuous-only" data-t="continuousKeys"></p>
+      <p id="live-weak" class="live-weak continuous-only" hidden></p>
+      <p class="legend continuous-only keys-help" data-t="continuousKeys"></p>
       <div class="actions"><button type="button" class="secondary" id="stop" data-t="stop"></button></div>
-    </div>
-    <div class="continuous-only">
-      <h2 data-t="liveTitle"></h2>
-      <table class="live">
-        <thead><tr><th data-t="sent"></th><th data-t="typed"></th><th class="num" data-t="repeatsCol"></th></tr></thead>
-        <tbody id="live"></tbody>
-      </table>
     </div>
   </section>
 
