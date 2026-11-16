@@ -39,8 +39,8 @@ const STORE_KEY = 'morse-trainer-settings';
 const LEAD_IN_S = 1.5;
 /** Continuous mode: pause between a typed group and the next one. */
 const NEXT_GROUP_S = 0.7;
-/** Continuous mode: rows kept in the live list. */
-const LIVE_ROWS = 100;
+/** Continuous mode: the last answers shown while practising (all are in the result). */
+const LIVE_ROWS = 4;
 
 function loadSettings(): Settings {
   try {
@@ -331,10 +331,9 @@ async function startContinuous(): Promise<void> {
 
     const row = document.createElement('tr');
     row.append(el('td', 'mono', score.sent), typedCell('td', score), el('td', 'num', repeats ? `↻ ${repeats}` : ''));
-    live.append(row);
-    while (live.children.length > LIVE_ROWS) live.firstElementChild?.remove();
+    live.prepend(row);
+    while (live.children.length > LIVE_ROWS) live.lastElementChild?.remove();
     liveWrap.hidden = false;
-    liveWrap.scrollTop = liveWrap.scrollHeight; // keep the newest in view
     updateStatus();
     nextGroup(NEXT_GROUP_S);
   };

@@ -141,11 +141,12 @@ body[data-practice="continuous"] .mode-notes [data-note="rounds"] { visibility: 
 #view-run > .panel { padding: 24px; }
 body[data-practice="continuous"] #view-run .runline { margin-top: 16px; }
 #view-run .legend { margin-top: 12px; }
-/* Continuous mode history: above the answer box, newest at the bottom. */
-.live-wrap { max-height: 40vh; overflow-y: auto; margin-bottom: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0 16px 6px; }
-table.live thead th { position: sticky; top: 0; background: var(--panel); padding-top: 8px; }
+/* Continuous mode: the last few answers below the answer box, newest first. */
+.live-wrap { margin-top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 16px; }
 table.live td { font-size: 1.15rem; }
-table.live tbody tr:last-child td { font-weight: 700; border-bottom: none; }
+table.live tbody tr:first-child td { font-weight: 700; }
+table.live tbody tr:last-child td { border-bottom: none; }
+table.live tbody tr:nth-child(n+3) { opacity: 0.6; }
 .live-weak { margin: 10px 0 0; color: var(--muted); }
 .live-weak .mono { color: var(--bad); font-weight: 700; margin-left: 8px; }
 
@@ -169,7 +170,7 @@ body.running p.lead, body.running nav.pages { display: none; }
   body[data-practice="continuous"] #view-run .runline { margin-top: 10px; }
   #view-run .actions { margin-top: 10px; }
   .keys-help { display: none; }
-  .live-wrap { max-height: 32vh; padding: 0 12px 4px; margin-bottom: 8px; }
+  .live-wrap { padding: 4px 12px; margin-top: 8px; }
   table.live td { font-size: 1.05rem; padding-top: 3px; padding-bottom: 3px; }
   .big { font-size: 2.6rem; }
 }
