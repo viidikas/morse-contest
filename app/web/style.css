@@ -136,6 +136,11 @@ body[data-practice="continuous"] .rounds-only { display: none; }
 .mode-notes p { grid-area: 1 / 1; margin: 0; }
 body[data-practice="rounds"] .mode-notes [data-note="continuous"],
 body[data-practice="continuous"] .mode-notes [data-note="rounds"] { visibility: hidden; }
+/* Running: more room around the answer box. Continuous mode has no progress
+   bar, which otherwise spaces the box from the status line. */
+#view-run > .panel { padding: 24px; }
+body[data-practice="continuous"] #view-run .runline { margin-top: 16px; }
+#view-run .legend { margin-top: 12px; }
 table.live td { font-size: 1.15rem; }
 table.live tbody tr:first-child td { font-weight: 700; }
 table.live tbody tr:nth-child(n+8) { opacity: 0.6; }
