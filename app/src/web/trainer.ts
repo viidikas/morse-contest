@@ -1,8 +1,10 @@
-// Solo trainer, run entirely in the browser, in two modes:
+// Solo trainer, run in the browser, in three modes:
 // - fixed round: a set number of groups on a fixed rhythm, the same
 //   listen-and-type loop a contest session uses, scored at the end;
 // - continuous: each group repeats until it has been typed, the answer is
-//   shown right away, and the session runs until Stop, which shows an analysis.
+//   shown right away, and the session runs until Stop, which shows an analysis;
+// - callsigns: like continuous, but with real callsigns from the server, and
+//   the answer is sent with Enter, since a callsign's length is not known.
 
 import { KOCH_ORDER, kochChars, makeTiming, buildTimeline, type Timeline } from '../engine/morse.js';
 import { makeRng, randomGroups, type Rng } from '../engine/content.js';
@@ -13,7 +15,8 @@ import { initChart } from './chart.js';
 import { t, type Key, type Lang } from './i18n.js';
 import { $, el, formatDuration, renderResult, typedCell } from './results.js';
 
-type Mode = 'rounds' | 'continuous';
+type Mode = 'rounds' | 'continuous' | 'callsigns';
+type Region = 'all' | 'es';
 
 interface Settings {
   lang: Lang;
@@ -27,14 +30,19 @@ interface Settings {
   pauseS: number;
   /** Continuous mode: characters in each group. */
   groupLen: number;
-  /** Continuous mode: silence after a group before it is played again. */
+  /** Continuous and callsign modes: silence after a group before it is played again. */
   repeatS: number;
+  /** Callsign mode: where the callsigns come from. */
+  callRegion: Region;
 }
 
 const DEFAULTS: Settings = {
   lang: 'en', mode: 'rounds', level: 2, charWpm: 20, effWpm: 8, pitch: 600, volume: 0.5, groups: 20, pauseS: 3,
-  groupLen: 3, repeatS: 2,
+  groupLen: 3, repeatS: 2, callRegion: 'all',
 };
+/** Callsign mode: how many to ask the server for at a time, and when to ask for more. */
+const CALL_BATCH = 20;
+const CALL_REFILL_AT = 5;
 const STORE_KEY = 'morse-trainer-settings';
 const LEAD_IN_S = 1.5;
 /** Continuous mode: pause between a typed group and the next one. */
@@ -88,14 +96,16 @@ function applyLanguage(): void {
 
 function applyMode(): void {
   document.body.dataset.practice = settings.mode;
-  document.querySelectorAll<HTMLButtonElement>('[data-practice]').forEach((b) => {
+  document.querySelectorAll<HTMLButtonElement>('.seg [data-practice]').forEach((b) => {
     b.setAttribute('aria-pressed', String(b.dataset.practice === settings.mode));
   });
+  $('setup-error').hidden = true;
+  updateDerived();
 }
 
 // ---------- settings form
 
-const fields: { id: string; key: Exclude<keyof Settings, 'lang' | 'mode'>; digits: number }[] = [
+const fields: { id: string; key: Exclude<keyof Settings, 'lang' | 'mode' | 'callRegion'>; digits: number }[] = [
   { id: 'level', key: 'level', digits: 0 },
   { id: 'charWpm', key: 'charWpm', digits: 0 },
   { id: 'effWpm', key: 'effWpm', digits: 0 },
@@ -120,7 +130,8 @@ function updateDerived(): void {
     if (out) out.textContent = settings[f.key].toFixed(f.digits);
   }
   $('chars').textContent = [...kochChars(settings.level)].join(' ');
-  chart.setActive(kochChars(settings.level));
+  // Callsigns use every letter and digit, whatever the level.
+  chart.setActive(settings.mode === 'callsigns' ? null : kochChars(settings.level));
   $('duration').textContent = formatDuration(currentTimeline(1).timeline.totalMs);
 }
 
@@ -147,12 +158,19 @@ function initForm(): void {
       applyLanguage();
     });
   });
-  document.querySelectorAll<HTMLButtonElement>('[data-practice]').forEach((b) => {
+  document.querySelectorAll<HTMLButtonElement>('.seg [data-practice]').forEach((b) => {
     b.addEventListener('click', () => {
       settings.mode = b.dataset.practice as Mode;
       saveSettings(settings);
       applyMode();
     });
+  });
+  const region = $<HTMLSelectElement>('callRegion');
+  if (settings.callRegion !== 'all' && settings.callRegion !== 'es') settings.callRegion = 'all';
+  region.value = settings.callRegion;
+  region.addEventListener('change', () => {
+    settings.callRegion = region.value as Region;
+    saveSettings(settings);
   });
 }
 
@@ -165,6 +183,8 @@ let lastScores: GroupScore[] | null = null;
 let lastTotal = 0;
 /** Continuous: the attempts of the last session, for the analysis. Null after a fixed round. */
 let lastAttempts: Attempt[] | null = null;
+/** The mode of the last finished session. */
+let lastMode: Mode = 'rounds';
 /** Ends the running session; set while one is running. */
 let stopHandler: (() => void) | null = null;
 /** Continuous: called when the answer field changes or Enter is pressed. */
@@ -257,20 +277,91 @@ function finishRound(timeline: Timeline, answers: string[], count: number): void
   endSession();
   lastTotal = timeline.groups.length;
   lastAttempts = null;
+  lastMode = 'rounds';
   lastScores = timeline.groups.slice(0, count).map((g, i) => scoreGroup(g.text, answers[i]));
   showResult();
   show('result');
   $<HTMLButtonElement>('again').focus();
 }
 
-// ---------- continuous practice
+// ---------- continuous practice (letter groups or callsigns)
+
+/** What a repeating session plays. */
+interface Source {
+  /** The next thing to play. */
+  next(): string;
+  /** Answer complete at this many characters; null = only Enter sends it. */
+  autoLen: number | null;
+}
+
+function groupSource(): Source {
+  const rng: Rng = makeRng(Date.now());
+  const chars = kochChars(settings.level);
+  const groupLength = settings.groupLen;
+  let last = '';
+  return {
+    autoLen: groupLength,
+    next() {
+      let next = last;
+      // Avoid the same group twice in a row when there is a choice.
+      for (let i = 0; i < 5 && next === last; i++) {
+        next = randomGroups(rng, chars, { count: 1, groupLength, newestWeight: 2 })[0];
+      }
+      return (last = next);
+    },
+  };
+}
+
+async function fetchCallsigns(region: Region): Promise<string[]> {
+  const res = await fetch(`../api/callsigns?region=${region}&n=${CALL_BATCH}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = (await res.json()) as { calls?: unknown };
+  return Array.isArray(data.calls) ? data.calls.filter((c): c is string => typeof c === 'string') : [];
+}
+
+/** Callsigns from the server, a batch at a time, fetching more before they run out. */
+async function callsignSource(): Promise<Source> {
+  const region = settings.callRegion;
+  const queue = await fetchCallsigns(region);
+  if (queue.length === 0) throw new Error('empty');
+  const played: string[] = [];
+  let fetching = false;
+  const refill = (): void => {
+    if (fetching) return;
+    fetching = true;
+    fetchCallsigns(region)
+      .then((calls) => queue.push(...calls.filter((c) => !played.includes(c))))
+      .catch(() => { /* try again on the next call; meanwhile reuse played ones */ })
+      .finally(() => { fetching = false; });
+  };
+  return {
+    autoLen: null,
+    next() {
+      if (queue.length <= CALL_REFILL_AT) refill();
+      // Out of new ones (no connection): play earlier ones again.
+      const call = queue.shift() ?? played[Math.floor(Math.random() * played.length)];
+      played.push(call);
+      return call;
+    },
+  };
+}
 
 async function startContinuous(): Promise<void> {
   await player.ready();
-  const rng: Rng = makeRng(Date.now());
-  const chars = kochChars(settings.level);
+  $('setup-error').hidden = true;
+  let source: Source;
+  if (settings.mode === 'callsigns') {
+    try {
+      source = await callsignSource();
+    } catch {
+      const err = $('setup-error');
+      err.textContent = t('callsignsUnavailable', settings.lang);
+      err.hidden = false;
+      return;
+    }
+  } else source = groupSource();
+  const mode = settings.mode;
   const timing = makeTiming(settings.charWpm, settings.effWpm);
-  const groupLen = settings.groupLen;
   const repeatS = settings.repeatS;
   const answer = prepareRun();
   const live = $('live');
@@ -296,12 +387,7 @@ async function startContinuous(): Promise<void> {
     return endAt;
   };
   const nextGroup = (delayS: number): void => {
-    let next = text;
-    // Avoid the same group twice in a row when there is a choice.
-    for (let i = 0; i < 5 && next === text; i++) {
-      next = randomGroups(rng, chars, { count: 1, groupLength: groupLen, newestWeight: 2 })[0];
-    }
-    text = next;
+    text = source.next();
     repeats = 0;
     firstEndAt = play(player.now() + delayS);
   };
@@ -309,7 +395,7 @@ async function startContinuous(): Promise<void> {
     const score = attempts.reduce((s, a) => s + a.score.correct, 0);
     const total = attempts.reduce((s, a) => s + a.score.total, 0);
     $('status').textContent = attempts.length
-      ? fill('continuousStatus', { n: attempts.length, a: Math.round((score / total) * 100) })
+      ? fill(mode === 'callsigns' ? 'callsignStatus' : 'continuousStatus', { n: attempts.length, a: Math.round((score / total) * 100) })
       : t('getReady', settings.lang);
     // The characters to watch so far, once there is enough to go on.
     const weak = attempts.length >= 5 ? analyzePractice(attempts).weak.slice(0, 5) : [];
@@ -323,7 +409,7 @@ async function startContinuous(): Promise<void> {
 
   answerHandler = (submit: boolean): void => {
     const typed = answer.value;
-    if (!submit && normalize(typed).length < groupLen) return;
+    if (!submit && (source.autoLen === null || normalize(typed).length < source.autoLen)) return;
     const score = scoreGroup(text, typed);
     attempts.push({ score, repeats, answerMs: Math.max(0, (player.now() - firstEndAt) * 1000) });
     player.stop();
@@ -355,6 +441,7 @@ async function startContinuous(): Promise<void> {
       return;
     }
     lastAttempts = attempts;
+    lastMode = mode;
     lastScores = attempts.map((a) => a.score);
     lastTotal = lastScores.length;
     showResult();
@@ -378,7 +465,8 @@ function showResult(): void {
   note.hidden = !partial;
   note.textContent = partial ? fill('stoppedEarly', { n: scores.length, total: lastTotal }) : '';
   // A level-up is suggested only after a full round or a long enough continuous session.
-  const enough = lastAttempts ? scores.length >= 20 : !partial;
+  // Callsigns are not tied to a level, so there is no level-up for them.
+  const enough = lastMode === 'callsigns' ? false : lastAttempts ? scores.length >= 20 : !partial;
   $('level-up').hidden = !(enough && sum.accuracy >= 0.9 && settings.level < KOCH_ORDER.length);
   $('analysis').hidden = !lastAttempts;
   if (lastAttempts) renderAnalysis(lastAttempts);
@@ -424,7 +512,7 @@ applyMode();
 applyLanguage();
 show('setup');
 $('test-tone').addEventListener('click', () => void testTone());
-$('start').addEventListener('click', () => void (settings.mode === 'continuous' ? startContinuous() : startRound()));
+$('start').addEventListener('click', () => void (settings.mode === 'rounds' ? startRound() : startContinuous()));
 $('stop').addEventListener('click', stopSession);
 $('again').addEventListener('click', () => show('setup'));
 $('answer').addEventListener('input', () => answerHandler?.(false));

@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { Contest, type Player } from './contest.js';
 import type { RoomConfig } from './room.js';
 import { Store, type StoreData, type User } from './store.js';
+import { Callsigns, REGIONS, type Region } from './callsigns.js';
 import {
   SESSION_COOKIE, SESSION_MAX_AGE_S, STATE_COOKIE, cookie, googleAuthUrl, googleIdentity,
   makeSession, parseCookies, readSession, type GoogleConfig,
@@ -81,6 +82,11 @@ const store = new Store(
 );
 process.on('SIGTERM', () => { flushToDisk(); process.exit(0); });
 process.on('SIGINT', () => { flushToDisk(); process.exit(0); });
+
+// Real callsigns for the practice page, kept next to the data file.
+const callsigns = new Callsigns(join(dirname(dataFile), 'MASTER.SCP'));
+void callsigns.refresh();
+setInterval(() => void callsigns.refresh(), 24 * 60 * 60_000).unref();
 
 const contest = new Contest(
   config,
@@ -227,6 +233,16 @@ async function api(req: http.IncomingMessage, res: http.ServerResponse, url: URL
   const route = `${req.method} ${url.pathname}`;
 
   if (route === 'GET /api/time') return sendJson(res, 200, { now });
+
+  // Practice needs no account, so neither do the callsigns it plays.
+  if (route === 'GET /api/callsigns') {
+    const region = url.searchParams.get('region') ?? 'all';
+    if (!REGIONS.includes(region as Region)) return sendJson(res, 400, { error: 'unknown-region' });
+    const n = Math.max(1, Math.min(50, Number(url.searchParams.get('n')) || 20));
+    const calls = callsigns.pick(region as Region, n);
+    void callsigns.refresh();
+    return calls.length ? sendJson(res, 200, { calls }) : sendJson(res, 503, { error: 'callsigns-unavailable' });
+  }
 
   const me = currentUser(req, now);
   if (route === 'GET /api/me') {

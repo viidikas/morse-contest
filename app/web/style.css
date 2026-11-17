@@ -124,8 +124,12 @@ button.link { background: none; border: none; padding: 0; font: inherit; font-si
 a.button.secondary { background: var(--panel); color: var(--text); border: 1px solid var(--line); }
 
 /* Trainer: fixed round or continuous practice */
-body[data-practice="rounds"] .continuous-only { display: none; }
-body[data-practice="continuous"] .rounds-only { display: none; }
+body[data-practice="rounds"] [data-modes]:not([data-modes~="rounds"]),
+body[data-practice="continuous"] [data-modes]:not([data-modes~="continuous"]),
+body[data-practice="callsigns"] [data-modes]:not([data-modes~="callsigns"]) { display: none; }
+.field-select { display: grid; gap: 4px; margin-bottom: 14px; }
+.field-select label { font-size: 0.95rem; }
+.field-select select { padding: 8px 10px; justify-self: start; min-width: 220px; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
 .seg button { font: inherit; border: none; background: none; color: var(--muted); padding: 7px 16px; cursor: pointer; }
 .seg button + button { border-left: 1px solid var(--line); }
@@ -134,12 +138,13 @@ body[data-practice="continuous"] .rounds-only { display: none; }
    one and the settings below do not move when the mode changes. */
 .mode-notes { display: grid; margin: 0 0 16px; font-size: 0.9rem; }
 .mode-notes p { grid-area: 1 / 1; margin: 0; }
-body[data-practice="rounds"] .mode-notes [data-note="continuous"],
-body[data-practice="continuous"] .mode-notes [data-note="rounds"] { visibility: hidden; }
+body[data-practice="rounds"] .mode-notes [data-note]:not([data-note="rounds"]),
+body[data-practice="continuous"] .mode-notes [data-note]:not([data-note="continuous"]),
+body[data-practice="callsigns"] .mode-notes [data-note]:not([data-note="callsigns"]) { visibility: hidden; }
 /* Running: more room around the answer box. Continuous mode has no progress
    bar, which otherwise spaces the box from the status line. */
 #view-run > .panel { padding: 24px; }
-body[data-practice="continuous"] #view-run .runline { margin-top: 16px; }
+body:not([data-practice="rounds"]) #view-run .runline { margin-top: 16px; }
 #view-run .legend { margin-top: 12px; }
 /* Continuous mode: the last few answers below the answer box, newest first. */
 .live-wrap { margin-top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 16px; }
@@ -167,7 +172,7 @@ body.running p.lead, body.running nav.pages { display: none; }
   #view-run > .panel { padding: 12px; }
   /* 16px or more, or iPhones zoom in when the box is focused. */
   #answer { font-size: 1.4rem; padding: 8px 10px; }
-  body[data-practice="continuous"] #view-run .runline { margin-top: 10px; }
+  body:not([data-practice="rounds"]) #view-run .runline { margin-top: 10px; }
   #view-run .actions { margin-top: 10px; }
   .keys-help { display: none; }
   .live-wrap { padding: 4px 12px; margin-top: 8px; }

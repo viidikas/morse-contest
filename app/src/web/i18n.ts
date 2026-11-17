@@ -58,6 +58,23 @@ const TEXT = {
     en: 'Each group repeats until you have typed all its letters, and you see right away what you got. Runs until you press Stop, then shows what to study more.',
     et: 'Iga grupp kordub, kuni oled kõik selle tähed trükkinud, ja näed kohe, mis õnnestus. Kestab, kuni vajutad Katkesta, ning näitab siis, mida veel harjutada.',
   },
+  modeCallsigns: { en: 'Callsigns', et: 'Kutsungid' },
+  modeCallsignsNote: {
+    en: 'Real callsigns heard on the air, from the Super Check Partial list. Each repeats until you send your answer with Enter.',
+    et: 'Päris kutsungid, mida eetris kuuleb, Super Check Partiali nimekirjast. Iga kutsung kordub, kuni saadad vastuse Enteriga.',
+  },
+  callRegion: { en: 'Callsigns from', et: 'Kutsungid' },
+  regionAll: { en: 'The whole world', et: 'Kogu maailmast' },
+  regionEs: { en: 'Estonia only (ES)', et: 'Ainult Eestist (ES)' },
+  callsignKeys: {
+    en: 'Type the callsign and press Enter. Esc stops.',
+    et: 'Trüki kutsung ja vajuta Enter. Esc lõpetab.',
+  },
+  callsignStatus: { en: '{n} callsigns · {a}% correct', et: '{n} kutsungit · {a}% õigeid' },
+  callsignsUnavailable: {
+    en: 'Callsigns could not be loaded. Check the connection and try again in a moment.',
+    et: 'Kutsungeid ei õnnestunud laadida. Kontrolli ühendust ja proovi hetke pärast uuesti.',
+  },
   groupLen: { en: 'Letters per group', et: 'Tähti grupis' },
   repeatAfter: { en: 'Repeat the group after (s)', et: 'Korda gruppi pärast (s)' },
   continuousKeys: {
